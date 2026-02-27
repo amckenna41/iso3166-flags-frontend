@@ -3,7 +3,7 @@
 An interactive map for exploring countries and their administrative subdivisions (regions/states) with comprehensive country and regional flags and detailed information sourced from the ISO 3166 standard. All data sourced from the custom-built [iso3166-flags](https://github.com/iso3166-flags) dataset and repository.
 
 Visit the ISO 3166 Flags Explorer here:
-> https://github.com/iso3166-flags
+> https://iso3166-flags.vercel.app/
 
 <br>
 

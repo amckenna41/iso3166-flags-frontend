@@ -400,7 +400,6 @@ const JSVectorMapComponent: React.FC<JSVectorMapProps> = ({
 }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
-  const [currentlySelected, setCurrentlySelected] = useState<string | null>(null);
   const currentlySelectedRef = useRef<string | null>(null);
   const [mousePosition, setMousePosition] = useState<{ x: number, y: number }>({ x: 0, y: 0 });
   const [customTooltip, setCustomTooltip] = useState<{
@@ -413,11 +412,12 @@ const JSVectorMapComponent: React.FC<JSVectorMapProps> = ({
 
 
   useEffect(() => {
-    if (!mapRef.current) return;
+    const currentMapRef = mapRef.current;
+    if (!currentMapRef) return;
 
     // Add mouse move listener to track cursor position
     const handleMouseMove = (e: MouseEvent) => {
-      const rect = mapRef.current?.getBoundingClientRect();
+      const rect = currentMapRef?.getBoundingClientRect();
       if (rect) {
         const newPosition = {
           x: e.clientX - rect.left,
@@ -436,7 +436,7 @@ const JSVectorMapComponent: React.FC<JSVectorMapProps> = ({
       }
     };
 
-    mapRef.current.addEventListener('mousemove', handleMouseMove);
+    currentMapRef.addEventListener('mousemove', handleMouseMove);
 
     // Destroy existing map instance
     if (mapInstance.current) {
@@ -448,7 +448,7 @@ const JSVectorMapComponent: React.FC<JSVectorMapProps> = ({
     }
 
     // Clear the container
-    mapRef.current.innerHTML = '';
+    currentMapRef.innerHTML = '';
 
     try {
       console.log(`🗺️ Initializing jsVectorMap with handlers:`, {
@@ -459,7 +459,7 @@ const JSVectorMapComponent: React.FC<JSVectorMapProps> = ({
       
       // Create new map instance
       mapInstance.current = new jsVectorMap({
-        selector: mapRef.current,
+        selector: currentMapRef,
         map: 'world',
         backgroundColor: '#f8fafc',
         zoomButtons: true,
@@ -498,7 +498,6 @@ const JSVectorMapComponent: React.FC<JSVectorMapProps> = ({
           console.log(`🖱️ Region clicked: ${code}, Country: ${countryName}`);
           console.log(`🎯 Setting currentlySelected to: ${countryCode}`);
           
-          setCurrentlySelected(countryCode);
           currentlySelectedRef.current = countryCode;
           
           console.log(`✅ State and ref updated, ref value: ${currentlySelectedRef.current}`);
@@ -647,8 +646,8 @@ const JSVectorMapComponent: React.FC<JSVectorMapProps> = ({
 
     return () => {
       // Clean up mouse move listener
-      if (mapRef.current) {
-        mapRef.current.removeEventListener('mousemove', handleMouseMove);
+      if (currentMapRef) {
+        currentMapRef.removeEventListener('mousemove', handleMouseMove);
       }
       
       if (mapInstance.current) {
@@ -660,6 +659,7 @@ const JSVectorMapComponent: React.FC<JSVectorMapProps> = ({
         }
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onCountryClick, onCountryHover, onCountryLeave]);
 
   // Update selected regions when props change (dropdown selection)
@@ -708,17 +708,15 @@ const JSVectorMapComponent: React.FC<JSVectorMapProps> = ({
             element.setAttribute('stroke-width', '1.5');
             element.setAttribute('data-selected', 'true');
             console.log(`✅ Successfully applied selection styling to: ${countryCode}`);
-            setCurrentlySelected(countryCode);
             currentlySelectedRef.current = countryCode;
           } else {
             console.error(`❌ Could not find region for code: ${countryCode}`);
             console.log(`Available regions: ${Object.keys(regions).join(', ')}`);
-            setCurrentlySelected(null);
+
             currentlySelectedRef.current = null;
           }
         } else {
           console.log(`ℹ️ No country selected, clearing selection`);
-          setCurrentlySelected(null);
           currentlySelectedRef.current = null;
         }
       } catch (error) {
