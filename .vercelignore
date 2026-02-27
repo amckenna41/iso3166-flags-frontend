@@ -1,0 +1,50 @@
+# Dependencies
+node_modules
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+
+# Testing
+coverage
+.test.ts
+.test.tsx
+
+# Production build
+build
+
+# Misc
+.DS_Store
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.pem
+
+# Git
+.git
+.gitignore
+
+# Documentation
+README.md
+*.md
+TODO.md
+ZOOM_DEBUGGING.md
+ZOOM_FIX.md
+MAP_STYLES.md
+NAVBAR_FIX.md
+SUBDIVISION_ENHANCEMENT.md
+README.old.md
+README-NEW.md
+PROJECT_OVERVIEW.md
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+logs
+*.log

@@ -1,6 +1,9 @@
-# ISO 3166 Flags Explorer
+# 🌍 ISO 3166 Flags Explorer
 
 An interactive map for exploring countries and their administrative subdivisions (regions/states) with comprehensive country and regional flags and detailed information sourced from the ISO 3166 standard. All data sourced from the custom-built [iso3166-flags](https://github.com/iso3166-flags) dataset and repository.
+
+Visit the ISO 3166 Flags Explorer here:
+> https://github.com/iso3166-flags
 
 ![ISO 3166 Flags Explorer Homepage](public/homepage-example.png)
 
@@ -10,7 +13,6 @@ An interactive map for exploring countries and their administrative subdivisions
 - **Rich Subdivision Data**: Access comprehensive information about over 5,000 administrative subdivisions including flags, local names, precise coordinates, parent codes, and historical change records from the ISO 3166-2 standard.
 - **Comprehensive Flags**: Browse thousands of official flags for countries and their subdivisions sourced from the [ISO 3166 Flags Dataset](https://github.com/amckenna41/iso3166-flags).
 - **Historical Updates**: Access historical information about changes to subdivision codes and naming conventions from the [ISO 3166 Updates Dataset](https://github.com/iso3166-updates).
-
 
 ## Data sources
 
