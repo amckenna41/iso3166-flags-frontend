@@ -229,10 +229,12 @@ const InteractiveMap: React.FC<InteractiveMapProps> = () => {
             />
           </div>
 
-          <SearchComponent
-            onResultSelect={handleSearchResult}
-            subdivisionDropdownVisible={selectedCountry !== null}
-          />
+          {selectedCountry && (
+            <SearchComponent
+              onResultSelect={handleSearchResult}
+              subdivisionDropdownVisible={true}
+            />
+          )}
 
           <CountryDropdown
             onCountrySelect={handleCountryClick}
