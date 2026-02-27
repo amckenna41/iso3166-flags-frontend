@@ -1,9 +1,10 @@
 import axios from 'axios';
+import APP_CONFIG from '../config/appConfig';
 
 // Base URLs for the APIs and data sources
-const ISO3166_2_API_BASE = 'https://iso3166-2-api.vercel.app/api';
-const FLAGS_BASE_URL = 'https://raw.githubusercontent.com/amckenna41/iso3166-flags/main';
-const REST_COUNTRIES_API = 'https://restcountries.com/v3.1';
+const ISO3166_2_API_BASE = APP_CONFIG.api.iso3166_2;
+const FLAGS_BASE_URL = APP_CONFIG.data.flagsRepository;
+const REST_COUNTRIES_API = APP_CONFIG.api.restCountries;
 
 // Types for RestCountries API
 export interface RestCountryData {
