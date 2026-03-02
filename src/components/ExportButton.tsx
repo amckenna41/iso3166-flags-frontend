@@ -100,12 +100,6 @@ const MenuItemStyled = styled.button<{ $disabled?: boolean }>`
   }
 `;
 
-const MenuDivider = styled.div`
-  height: 1px;
-  background: #e0e0e0;
-  margin: 4px 0;
-`;
-
 interface ExportButtonProps {
   country: any | null;
   subdivisions: any[];
