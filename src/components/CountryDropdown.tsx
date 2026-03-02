@@ -10,6 +10,20 @@ const DropdownContainer = styled.div`
   z-index: 1100;
   width: 280px;
   pointer-events: auto;
+  
+  @media (max-width: 768px) {
+    top: 110px;
+    left: 12px;
+    width: calc(100% - 24px);
+    max-width: 320px;
+  }
+  
+  @media (max-width: 480px) {
+    top: 100px;
+    left: 8px;
+    width: calc(100% - 16px);
+    max-width: 100%;
+  }
 `;
 
 const DropdownButton = styled.button`

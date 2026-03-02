@@ -13,6 +13,26 @@ const DropdownContainer = styled.div<{ $visible: boolean }>`
   visibility: ${props => props.$visible ? 'visible' : 'hidden'};
   transition: all 0.3s ease;
   pointer-events: ${props => props.$visible ? 'auto' : 'none'};
+  
+  @media (max-width: 1024px) {
+    left: 320px;
+  }
+  
+  @media (max-width: 768px) {
+    position: fixed;
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    max-height: 70vh;
+    border-radius: 16px 16px 0 0;
+    z-index: 1150;
+  }
+  
+  @media (max-width: 480px) {
+    max-height: 60vh;
+  }
 `;
 
 const DropdownButton = styled.button`
@@ -29,6 +49,7 @@ const DropdownButton = styled.button`
   cursor: pointer;
   transition: all 0.2s;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  min-height: 44px;
 
   &:hover {
     border-color: #667eea;
@@ -38,6 +59,11 @@ const DropdownButton = styled.button`
   &:disabled {
     opacity: 0.6;
     cursor: not-allowed;
+  }
+  
+  @media (max-width: 480px) {
+    font-size: 13px;
+    padding: 10px 12px;
   }
 `;
 
@@ -86,6 +112,21 @@ const DropdownMenu = styled.div<{ $isOpen: boolean }>`
   transition: all 0.3s ease;
   margin-top: 4px;
   z-index: 1001;
+  
+  @media (max-width: 768px) {
+    position: fixed;
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    border-radius: 16px 16px 0 0;
+    max-height: ${props => props.$isOpen ? '60vh' : '0'};
+    margin-top: 0;
+  }
+  
+  @media (max-width: 480px) {
+    max-height: ${props => props.$isOpen ? '50vh' : '0'};
+  }
 `;
 
 const SearchInput = styled.input`
@@ -95,6 +136,7 @@ const SearchInput = styled.input`
   border-bottom: 1px solid #e0e0e0;
   font-size: 14px;
   background: transparent;
+  min-height: 44px;
   
   &:focus {
     outline: none;

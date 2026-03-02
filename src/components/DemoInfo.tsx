@@ -1,6 +1,6 @@
 import React from 'react';
 import styled from 'styled-components';
-import { MapPin, Flag, Globe, Calendar } from 'lucide-react';
+import { MapPin, Flag, Globe, Calendar, Package, Github } from 'lucide-react';
 
 const DemoContainer = styled.div`
   padding: 20px;
@@ -83,7 +83,27 @@ const StatLabel = styled.div`
   opacity: 0.9;
 `;
 
+const MadeByContainer = styled.div`
+  text-align: center;
+  margin-top: 24px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 
+  a {
+    color: #667eea;
+    text-decoration: none;
+    font-weight: 600;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+`;
 
 const DemoInfo: React.FC = () => {
   return (
@@ -155,7 +175,22 @@ const DemoInfo: React.FC = () => {
             Access historical information about changes to subdivision codes and naming conventions pulled via the ISO 3166 updates dataset (<a href="https://github.com/iso3166-updates" target="_blank" rel="noopener noreferrer" style={{ color: '#9C27B0', textDecoration: 'underline' }}>https://github.com/iso3166-updates</a>).
           </FeatureDescription>
         </FeatureCard>
+
+        <FeatureCard>
+          <FeatureHeader>
+            <Package size={16} color="#E91E63" />
+            <FeatureTitle>ISO 3166 Series</FeatureTitle>
+          </FeatureHeader>
+          <FeatureDescription>
+            This project is a part of a suite of apps built around the ISO 3166 standard. The others include <a href="https://www.github.com/amckenna41/iso3166-updates" target="_blank" rel="noopener noreferrer" style={{ color: '#E91E63', textDecoration: 'underline' }}>iso3166-updates</a> which is a package that tracks historical and new updates to the standard and <a href="https://www.github.com/amckenna41/iso3166-2" target="_blank" rel="noopener noreferrer" style={{ color: '#E91E63', textDecoration: 'underline' }}>iso3166-2</a> which is a comprehensive dataset of subdivision data for the ISO 3166-2 which acts as the data source for the subdivision data in this map. Both of these packages also have respective APIs: <a href="https://www.github.com/amckenna41/iso3166-updates-api" target="_blank" rel="noopener noreferrer" style={{ color: '#E91E63', textDecoration: 'underline' }}>iso3166-updates-api</a> and <a href="https://www.github.com/amckenna41/iso3166-2-api" target="_blank" rel="noopener noreferrer" style={{ color: '#E91E63', textDecoration: 'underline' }}>iso3166-2-api</a>.
+          </FeatureDescription>
+        </FeatureCard>
       </FeatureGrid>
+
+      <MadeByContainer>
+        <Github size={20} />
+        Made by <a href="https://www.github.com/amckenna41" target="_blank" rel="noopener noreferrer">me</a>
+      </MadeByContainer>
     </DemoContainer>
   );
 };

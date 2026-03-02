@@ -3,6 +3,7 @@ import styled from 'styled-components';
 import { X, MapPin, Flag, Globe, Users, Calendar, ExternalLink, Code, Building2, Compass, Ruler, ChevronLeft, ChevronRight } from 'lucide-react';
 import { CountryData, RestCountryData, iso3166Service } from '../services/iso3166Service';
 import DemoInfo from './DemoInfo';
+import ExportButton from './ExportButton';
 
 const InfoContainer = styled.div`
   height: 100%;
@@ -15,6 +16,14 @@ const Header = styled.div`
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   position: relative;
+  
+  @media (max-width: 768px) {
+    padding: 16px;
+  }
+  
+  @media (max-width: 480px) {
+    padding: 12px;
+  }
 `;
 
 const CloseButton = styled.button`
@@ -38,10 +47,30 @@ const CloseButton = styled.button`
   }
 `;
 
+const ExportButtonContainer = styled.div`
+  position: absolute;
+  top: 15px;
+  right: 55px;
+  
+  @media (max-width: 480px) {
+    right: 50px;
+  }
+`;
+
 const CountryTitle = styled.h2`
   margin: 0 40px 10px 0;
   font-size: 24px;
   font-weight: 600;
+  
+  @media (max-width: 768px) {
+    font-size: 20px;
+    margin-right: 32px;
+  }
+  
+  @media (max-width: 480px) {
+    font-size: 18px;
+    margin-right: 28px;
+  }
 `;
 
 const CountryFlag = styled.img`
@@ -50,6 +79,14 @@ const CountryFlag = styled.img`
   border: 2px solid rgba(255, 255, 255, 0.3);
   border-radius: 8px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  
+  @media (max-width: 768px) {
+    width: 70px;
+  }
+  
+  @media (max-width: 480px) {
+    width: 60px;
+  }
 `;
 
 const CountryDetails = styled.div`
@@ -58,6 +95,17 @@ const CountryDetails = styled.div`
   grid-template-columns: 1fr 1fr;
   gap: 15px;
   font-size: 15px;
+  
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    font-size: 14px;
+  }
+  
+  @media (max-width: 480px) {
+    gap: 10px;
+    font-size: 13px;
+  }
 `;
 
 const CountryDetailItem = styled.div`
@@ -86,6 +134,19 @@ const CountryDetailItem = styled.div`
     word-wrap: break-word;
     line-height: 1.4;
   }
+  
+  @media (max-width: 480px) {
+    gap: 6px;
+    
+    .label {
+      min-width: 60px;
+      font-size: 12px;
+    }
+    
+    .value {
+      font-size: 12px;
+    }
+  }
 `;
 
 const CodesContainer = styled.div`
@@ -93,6 +154,12 @@ const CodesContainer = styled.div`
   display: flex;
   gap: 15px;
   margin-top: 8px;
+  flex-wrap: wrap;
+  
+  @media (max-width: 480px) {
+    gap: 8px;
+    margin-top: 6px;
+  }
 `;
 
 const CodeBadge = styled.span`
@@ -102,6 +169,11 @@ const CodeBadge = styled.span`
   font-size: 12px;
   font-weight: 600;
   font-family: monospace;
+  
+  @media (max-width: 480px) {
+    font-size: 11px;
+    padding: 3px 6px;
+  }
 `;
 
 const Content = styled.div`
@@ -116,6 +188,14 @@ const StatsContainer = styled.div`
   padding: 20px;
   background: #f8f9fa;
   border-bottom: 1px solid #e9ecef;
+  
+  @media (max-width: 768px) {
+    padding: 16px;
+  }
+  
+  @media (max-width: 480px) {
+    padding: 12px;
+  }
 `;
 
 const Stat = styled.div`
@@ -135,10 +215,23 @@ const Stat = styled.div`
     margin-top: 1px; /* Slight adjustment to align with text baseline */
     flex-shrink: 0; /* Prevent icon from shrinking */
   }
+  
+  @media (max-width: 480px) {
+    font-size: 12px;
+    gap: 6px;
+  }
 `;
 
 const SubdivisionsContainer = styled.div`
   padding: 20px;
+  
+  @media (max-width: 768px) {
+    padding: 16px;
+  }
+  
+  @media (max-width: 480px) {
+    padding: 12px;
+  }
 `;
 
 const SectionTitle = styled.h3`
@@ -148,6 +241,16 @@ const SectionTitle = styled.h3`
   display: flex;
   align-items: center;
   gap: 8px;
+  
+  @media (max-width: 768px) {
+    font-size: 16px;
+    margin-bottom: 12px;
+  }
+  
+  @media (max-width: 480px) {
+    font-size: 14px;
+    margin-bottom: 10px;
+  }
 `;
 
 const SubdivisionsList = styled.div`
@@ -817,6 +920,13 @@ const CountryInfo: React.FC<CountryInfoProps> = ({ countryName, countryData, cou
         <CloseButton onClick={onClose}>
           <X size={18} />
         </CloseButton>
+        <ExportButtonContainer>
+          <ExportButton 
+            country={countryInfo} 
+            subdivisions={subdivisions} 
+            countryName={countryName || undefined} 
+          />
+        </ExportButtonContainer>
         <CountryTitle>{countryName}</CountryTitle>
         {getCountryCode() && (
           <CountryFlag

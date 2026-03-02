@@ -17,6 +17,18 @@ const HeaderContainer = styled.header`
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   z-index: 1000;
   min-height: 52px;
+  
+  @media (max-width: 768px) {
+    padding: 10px 12px;
+    min-height: 48px;
+  }
+  
+  @media (max-width: 480px) {
+    padding: 8px 8px;
+    min-height: 44px;
+    flex-direction: column;
+    gap: 8px;
+  }
 `;
 
 const Logo = styled.div`
@@ -25,18 +37,45 @@ const Logo = styled.div`
   gap: 12px;
   font-size: 36px;
   font-weight: 600;
+  
+  @media (max-width: 768px) {
+    gap: 8px;
+    font-size: 28px;
+  }
+  
+  @media (max-width: 480px) {
+    gap: 6px;
+    font-size: 24px;
+  }
 `;
 
 const Title = styled.h1`
   margin: 0;
   font-size: 28px;
   font-weight: 600;
+  
+  @media (max-width: 768px) {
+    font-size: 20px;
+  }
+  
+  @media (max-width: 480px) {
+    font-size: 16px;
+  }
 `;
 
 const Navigation = styled.nav`
   display: flex;
   align-items: center;
   gap: 16px;
+  
+  @media (max-width: 768px) {
+    gap: 8px;
+  }
+  
+  @media (max-width: 480px) {
+    flex-direction: column;
+    gap: 4px;
+  }
 `;
 
 const NavLink = styled.a`
@@ -52,6 +91,22 @@ const NavLink = styled.a`
 
   &:hover {
     background: rgba(255, 255, 255, 0.1);
+  }
+  
+  @media (max-width: 768px) {
+    font-size: 14px;
+    padding: 4px 8px;
+    gap: 4px;
+  }
+  
+  @media (max-width: 480px) {
+    font-size: 12px;
+    padding: 3px 6px;
+    gap: 3px;
+    
+    span:last-child {
+      display: none;
+    }
   }
 `;
 
@@ -71,6 +126,22 @@ const InfoButton = styled.button`
   &:hover {
     background: rgba(255, 255, 255, 0.2);
     border-color: rgba(255, 255, 255, 0.3);
+  }
+  
+  @media (max-width: 768px) {
+    font-size: 12px;
+    padding: 4px 8px;
+    gap: 4px;
+  }
+  
+  @media (max-width: 480px) {
+    font-size: 11px;
+    padding: 3px 6px;
+    gap: 3px;
+    
+    span:last-child {
+      display: none;
+    }
   }
 `;
 
