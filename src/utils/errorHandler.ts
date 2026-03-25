@@ -20,10 +20,13 @@ export class AppError extends Error {
 /**
  * Parse error and return user-friendly message
  */
-export const getErrorMessage = (error: any): { message: string; isRetryable: boolean } => {
+export const getErrorMessage = (error: unknown): { message: string; isRetryable: boolean } => {
+  // Narrow unknown to an object shape that axios/network errors typically have
+  const err = error as { response?: { status: number }; code?: string; message?: string } | null;
+
   // Handle axios errors
-  if (error?.response) {
-    const status = error.response.status;
+  if (err?.response) {
+    const status = err.response.status;
     
     if (status === 404) {
       return {
@@ -53,14 +56,14 @@ export const getErrorMessage = (error: any): { message: string; isRetryable: boo
   }
   
   // Handle network errors
-  if (error?.code === 'ECONNABORTED' || error?.message?.includes('timeout')) {
+  if (err?.code === 'ECONNABORTED' || err?.message?.includes('timeout')) {
     return {
       message: 'The request took too long. Please check your connection and try again.',
       isRetryable: true,
     };
   }
   
-  if (!error?.response && error?.code) {
+  if (!err?.response && err?.code) {
     return {
       message: 'Network connection error. Please check your internet connection and try again.',
       isRetryable: true,

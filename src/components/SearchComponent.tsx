@@ -285,24 +285,28 @@ const SearchComponent: React.FC<SearchComponentProps> = ({ onResultSelect, subdi
           onChange={handleInputChange}
           onFocus={handleInputFocus}
           onBlur={handleInputBlur}
+          aria-label="Search subdivisions"
+          aria-autocomplete="list"
+          aria-expanded={showResults && query.length >= 2}
+          aria-controls="search-results-list"
         />
         {isLoading ? (
           <LoadingIcon>
             <Loader size={18} />
           </LoadingIcon>
         ) : query && (
-          <ClearButton onClick={handleClear}>
+          <ClearButton onClick={handleClear} aria-label="Clear search">
             <X size={18} />
           </ClearButton>
         )}
       </SearchInput>
 
       {showResults && query.length >= 2 && (
-        <SearchResults>
+        <SearchResults id="search-results-list" role="listbox">
           {displayResults.length > 0 ? (
             displayResults.map((result) => (
-              <SearchResultItem
-                key={`${result.countryCode}-${result.subdivisionCode}`}
+              <SearchResultItem                role="option"
+                aria-selected={false}                key={`${result.countryCode}-${result.subdivisionCode}`}
                 onClick={() => handleResultClick(result.countryCode, result.subdivisionName, result.subdivisionCode)}
               >
                 <ResultTitle>{result.subdivisionName}</ResultTitle>

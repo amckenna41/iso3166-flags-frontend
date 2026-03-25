@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react'
 import styled from 'styled-components';
 import { X, MapPin, Flag, Globe, Users, Calendar, ExternalLink, Code, Building2, Compass, Ruler, ChevronLeft, ChevronRight } from 'lucide-react';
 import { CountryData, RestCountryData, iso3166Service } from '../services/iso3166Service';
+import APP_CONFIG from '../config/appConfig';
 import DemoInfo from './DemoInfo';
 import ExportButton from './ExportButton';
 
@@ -724,8 +725,6 @@ interface CountryInfoProps {
 }
 
 const CountryInfo: React.FC<CountryInfoProps> = ({ countryName, countryData, countryCode, highlightedSubdivision, onClose }) => {
-  console.log('CountryInfo props:', { countryName, countryData, countryCode, subdivisionCount: countryData ? Object.keys(countryData).length : 0 });
-  
   const [showRawData, setShowRawData] = useState<{ [key: string]: boolean }>({});
   const [countryInfo, setCountryInfo] = useState<RestCountryData | null>(null);
   const [loadingInfo, setLoadingInfo] = useState(false);
@@ -734,15 +733,6 @@ const CountryInfo: React.FC<CountryInfoProps> = ({ countryName, countryData, cou
   
   // Ref to track subdivision elements for scrolling
   const subdivisionRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
-
-  // Debug: Track when countryData changes
-  useEffect(() => {
-    console.log('CountryData changed:', countryData);
-    if (countryData) {
-      console.log('Subdivision keys:', Object.keys(countryData));
-      console.log('First subdivision:', Object.values(countryData)[0]);
-    }
-  }, [countryData]);
 
   const subdivisions = useMemo(() => {
     if (!countryData) return [];
@@ -790,46 +780,27 @@ const CountryInfo: React.FC<CountryInfoProps> = ({ countryName, countryData, cou
   // Fetch country information from RestCountries API
   useEffect(() => {
     const fetchCountryInfo = async () => {
-      console.log('🏛️ Fetching country info - subdivisions:', subdivisions.length, 'countryCode prop:', countryCode);
-      
       // Clear previous country info when switching countries
       setCountryInfo(null);
       setLoadingInfo(false);
       
-      // Determine the country code to use
+      // Determine the country code from subdivisions or the explicit prop
       let targetCountryCode: string | null = null;
       
       if (subdivisions.length > 0) {
-        // If we have subdivisions, extract country code from subdivision code
         targetCountryCode = subdivisions[0].code.split('-')[0];
-        console.log('🏛️ Using country code from subdivision:', targetCountryCode);
       } else if (countryCode) {
-        // If no subdivisions but we have a country code prop, use that
         targetCountryCode = countryCode.toUpperCase();
-        console.log('🏛️ Using country code from prop:', targetCountryCode);
       }
       
-      if (!targetCountryCode) {
-        console.log('🏛️ No target country code found, skipping country info fetch');
-        return;
-      }
+      if (!targetCountryCode) return;
 
       setLoadingInfo(true);
-      console.log('🏛️ Fetching country info for:', targetCountryCode);
       try {
         const info = await iso3166Service.getCountryInfo(targetCountryCode);
-        console.log('🏛️ Country info received:', info ? 'Success' : 'No data');
-        if (info) {
-          console.log('🏛️ Country info details:', {
-            name: info.name?.common,
-            capital: info.capital?.[0],
-            population: info.population,
-            area: info.area
-          });
-        }
         setCountryInfo(info);
       } catch (error) {
-        console.error('🏛️ Error fetching country info:', error);
+        console.error('Error fetching country info:', error);
         setCountryInfo(null);
       } finally {
         setLoadingInfo(false);
@@ -921,11 +892,13 @@ const CountryInfo: React.FC<CountryInfoProps> = ({ countryName, countryData, cou
           <X size={18} />
         </CloseButton>
         <ExportButtonContainer>
-          <ExportButton 
-            country={countryInfo} 
-            subdivisions={subdivisions} 
-            countryName={countryName || undefined} 
-          />
+          {APP_CONFIG.features.enableExport && (
+            <ExportButton 
+              country={countryInfo} 
+              subdivisions={subdivisions} 
+              countryName={countryName || undefined} 
+            />
+          )}
         </ExportButtonContainer>
         <CountryTitle>{countryName}</CountryTitle>
         {getCountryCode() && (

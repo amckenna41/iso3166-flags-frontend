@@ -1,6 +1,7 @@
 /**
  * Export utilities for CSV and JSON data export
  */
+import { RestCountryData, SubdivisionData } from '../services/iso3166Service';
 
 export interface CountryExportData {
   'Country Name': string;
@@ -119,10 +120,55 @@ export const exportCountriesComparison = (
   downloadCSV(csvContent, filename);
 };
 
+// ── JSON export helpers ───────────────────────────────────────────────────────
+
+/**
+ * Download a JSON file to the user's device
+ */
+export const downloadJSON = (data: object, filename: string): void => {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+
+  link.setAttribute('href', url);
+  link.setAttribute('download', filename);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
+
+/**
+ * Export country data as a JSON file
+ */
+export const exportCountryAsJSON = (country: CountryExportData): void => {
+  const timestamp = new Date().toISOString().split('T')[0];
+  const filename = `${country['Country Name']
+    .toLowerCase()
+    .replace(/\s+/g, '-')}-${country['ISO 3166-1 Alpha-2'].toLowerCase()}-${timestamp}.json`;
+  downloadJSON(country, filename);
+};
+
+/**
+ * Export subdivisions as a JSON file
+ */
+export const exportSubdivisionsAsJSON = (
+  subdivisions: SubdivisionExportData[],
+  countryName: string,
+  countryCode: string
+): void => {
+  const timestamp = new Date().toISOString().split('T')[0];
+  const filename = `${countryName
+    .toLowerCase()
+    .replace(/\s+/g, '-')}-subdivisions-${countryCode.toLowerCase()}-${timestamp}.json`;
+  downloadJSON(subdivisions, filename);
+};
+
 /**
  * Format country object for export
  */
-export const formatCountryForExport = (country: any): CountryExportData => {
+export const formatCountryForExport = (country: RestCountryData): CountryExportData => {
   return {
     'Country Name': country.name?.common || country.name?.official || '',
     'ISO 3166-1 Alpha-2': country.cca2 || '',
@@ -143,7 +189,7 @@ export const formatCountryForExport = (country: any): CountryExportData => {
  * Format subdivision object for export
  */
 export const formatSubdivisionForExport = (
-  subdivision: any,
+  subdivision: SubdivisionData,
   countryName: string
 ): SubdivisionExportData => {
   const latitude = subdivision.latLng && subdivision.latLng[0] ? String(subdivision.latLng[0]) : '';

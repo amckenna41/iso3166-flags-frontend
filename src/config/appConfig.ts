@@ -10,15 +10,15 @@ export const APP_CONFIG = {
   name: 'ISO 3166 Flags Explorer',
   version: '1.0.0',
   
-  // API Configuration
+  // API Configuration — values come from environment variables (see .env.example)
   api: {
-    iso3166_2: 'https://iso3166-2-api.vercel.app/api',
-    restCountries: 'https://restcountries.com/v3.1',
+    iso3166_2: process.env.REACT_APP_ISO3166_2_API ?? 'https://iso3166-2-api.vercel.app/api',
+    restCountries: process.env.REACT_APP_REST_COUNTRIES_API ?? 'https://restcountries.com/v3.1',
   },
   
   // Data source URLs
   data: {
-    flagsRepository: 'https://raw.githubusercontent.com/amckenna41/iso3166-flags/main',
+    flagsRepository: process.env.REACT_APP_FLAGS_REPOSITORY ?? 'https://raw.githubusercontent.com/amckenna41/iso3166-flags/main',
   },
   
   // External links
@@ -32,6 +32,10 @@ export const APP_CONFIG = {
   features: {
     showDebugLogs: false,
     enableKeyboardNavigation: true,
+    // Toggle individual UI features without code changes
+    enableExport: true,
+    enableSearch: true,
+    enableUsageGuide: true,
   },
 };
 

@@ -7,261 +7,15 @@ import { iso3166Service } from '../services/iso3166Service';
 // Import world map data
 import 'jsvectormap/dist/maps/world.js';
 
-// Helper function to get country name from country code
+// Resolve a 2-letter ISO 3166-1 code to an English country name using the
+// browser's built-in Intl.DisplayNames API, with a code-string fallback.
 const getCountryName = (code: string): string => {
-  const countryNames: { [key: string]: string } = {
-    'ad': 'Andorra',
-    'ae': 'United Arab Emirates',
-    'af': 'Afghanistan',
-    'ag': 'Antigua and Barbuda',
-    'ai': 'Anguilla',
-    'al': 'Albania',
-    'am': 'Armenia',
-    'ao': 'Angola',
-    'aq': 'Antarctica',
-    'ar': 'Argentina',
-    'as': 'American Samoa',
-    'at': 'Austria',
-    'au': 'Australia',
-    'aw': 'Aruba',
-    'ax': 'Åland Islands',
-    'az': 'Azerbaijan',
-    'ba': 'Bosnia and Herzegovina',
-    'bb': 'Barbados',
-    'bd': 'Bangladesh',
-    'be': 'Belgium',
-    'bf': 'Burkina Faso',
-    'bg': 'Bulgaria',
-    'bh': 'Bahrain',
-    'bi': 'Burundi',
-    'bj': 'Benin',
-    'bl': 'Saint Barthélemy',
-    'bm': 'Bermuda',
-    'bn': 'Brunei',
-    'bo': 'Bolivia',
-    'bq': 'Caribbean Netherlands',
-    'br': 'Brazil',
-    'bs': 'Bahamas',
-    'bt': 'Bhutan',
-    'bv': 'Bouvet Island',
-    'bw': 'Botswana',
-    'by': 'Belarus',
-    'bz': 'Belize',
-    'ca': 'Canada',
-    'cc': 'Cocos Islands',
-    'cd': 'Democratic Republic of the Congo',
-    'cf': 'Central African Republic',
-    'cg': 'Republic of the Congo',
-    'ch': 'Switzerland',
-    'ci': 'Côte d\'Ivoire',
-    'ck': 'Cook Islands',
-    'cl': 'Chile',
-    'cm': 'Cameroon',
-    'cn': 'China',
-    'co': 'Colombia',
-    'cr': 'Costa Rica',
-    'cu': 'Cuba',
-    'cv': 'Cape Verde',
-    'cw': 'Curaçao',
-    'cx': 'Christmas Island',
-    'cy': 'Cyprus',
-    'cz': 'Czech Republic',
-    'de': 'Germany',
-    'dj': 'Djibouti',
-    'dk': 'Denmark',
-    'dm': 'Dominica',
-    'do': 'Dominican Republic',
-    'dz': 'Algeria',
-    'ec': 'Ecuador',
-    'ee': 'Estonia',
-    'eg': 'Egypt',
-    'eh': 'Western Sahara',
-    'er': 'Eritrea',
-    'es': 'Spain',
-    'et': 'Ethiopia',
-    'fi': 'Finland',
-    'fj': 'Fiji',
-    'fk': 'Falkland Islands',
-    'fm': 'Micronesia',
-    'fo': 'Faroe Islands',
-    'fr': 'France',
-    'ga': 'Gabon',
-    'gb': 'United Kingdom',
-    'gd': 'Grenada',
-    'ge': 'Georgia',
-    'gf': 'French Guiana',
-    'gg': 'Guernsey',
-    'gh': 'Ghana',
-    'gi': 'Gibraltar',
-    'gl': 'Greenland',
-    'gm': 'Gambia',
-    'gn': 'Guinea',
-    'gp': 'Guadeloupe',
-    'gq': 'Equatorial Guinea',
-    'gr': 'Greece',
-    'gs': 'South Georgia and the South Sandwich Islands',
-    'gt': 'Guatemala',
-    'gu': 'Guam',
-    'gw': 'Guinea-Bissau',
-    'gy': 'Guyana',
-    'hk': 'Hong Kong',
-    'hm': 'Heard Island and McDonald Islands',
-    'hn': 'Honduras',
-    'hr': 'Croatia',
-    'ht': 'Haiti',
-    'hu': 'Hungary',
-    'id': 'Indonesia',
-    'ie': 'Ireland',
-    'il': 'Israel',
-    'im': 'Isle of Man',
-    'in': 'India',
-    'io': 'British Indian Ocean Territory',
-    'iq': 'Iraq',
-    'ir': 'Iran',
-    'is': 'Iceland',
-    'it': 'Italy',
-    'je': 'Jersey',
-    'jm': 'Jamaica',
-    'jo': 'Jordan',
-    'jp': 'Japan',
-    'ke': 'Kenya',
-    'kg': 'Kyrgyzstan',
-    'kh': 'Cambodia',
-    'ki': 'Kiribati',
-    'km': 'Comoros',
-    'kn': 'Saint Kitts and Nevis',
-    'kp': 'North Korea',
-    'kr': 'South Korea',
-    'kw': 'Kuwait',
-    'ky': 'Cayman Islands',
-    'kz': 'Kazakhstan',
-    'la': 'Laos',
-    'lb': 'Lebanon',
-    'lc': 'Saint Lucia',
-    'li': 'Liechtenstein',
-    'lk': 'Sri Lanka',
-    'lr': 'Liberia',
-    'ls': 'Lesotho',
-    'lt': 'Lithuania',
-    'lu': 'Luxembourg',
-    'lv': 'Latvia',
-    'ly': 'Libya',
-    'ma': 'Morocco',
-    'mc': 'Monaco',
-    'md': 'Moldova',
-    'me': 'Montenegro',
-    'mf': 'Saint Martin',
-    'mg': 'Madagascar',
-    'mh': 'Marshall Islands',
-    'mk': 'North Macedonia',
-    'ml': 'Mali',
-    'mm': 'Myanmar',
-    'mn': 'Mongolia',
-    'mo': 'Macao',
-    'mp': 'Northern Mariana Islands',
-    'mq': 'Martinique',
-    'mr': 'Mauritania',
-    'ms': 'Montserrat',
-    'mt': 'Malta',
-    'mu': 'Mauritius',
-    'mv': 'Maldives',
-    'mw': 'Malawi',
-    'mx': 'Mexico',
-    'my': 'Malaysia',
-    'mz': 'Mozambique',
-    'na': 'Namibia',
-    'nc': 'New Caledonia',
-    'ne': 'Niger',
-    'nf': 'Norfolk Island',
-    'ng': 'Nigeria',
-    'ni': 'Nicaragua',
-    'nl': 'Netherlands',
-    'no': 'Norway',
-    'np': 'Nepal',
-    'nr': 'Nauru',
-    'nu': 'Niue',
-    'nz': 'New Zealand',
-    'om': 'Oman',
-    'pa': 'Panama',
-    'pe': 'Peru',
-    'pf': 'French Polynesia',
-    'pg': 'Papua New Guinea',
-    'ph': 'Philippines',
-    'pk': 'Pakistan',
-    'pl': 'Poland',
-    'pm': 'Saint Pierre and Miquelon',
-    'pn': 'Pitcairn',
-    'pr': 'Puerto Rico',
-    'ps': 'Palestine',
-    'pt': 'Portugal',
-    'pw': 'Palau',
-    'py': 'Paraguay',
-    'qa': 'Qatar',
-    're': 'Réunion',
-    'ro': 'Romania',
-    'rs': 'Serbia',
-    'ru': 'Russia',
-    'rw': 'Rwanda',
-    'sa': 'Saudi Arabia',
-    'sb': 'Solomon Islands',
-    'sc': 'Seychelles',
-    'sd': 'Sudan',
-    'se': 'Sweden',
-    'sg': 'Singapore',
-    'sh': 'Saint Helena',
-    'si': 'Slovenia',
-    'sj': 'Svalbard and Jan Mayen',
-    'sk': 'Slovakia',
-    'sl': 'Sierra Leone',
-    'sm': 'San Marino',
-    'sn': 'Senegal',
-    'so': 'Somalia',
-    'sr': 'Suriname',
-    'ss': 'South Sudan',
-    'st': 'São Tomé and Príncipe',
-    'sv': 'El Salvador',
-    'sx': 'Sint Maarten',
-    'sy': 'Syria',
-    'sz': 'Eswatini',
-    'tc': 'Turks and Caicos Islands',
-    'td': 'Chad',
-    'tf': 'French Southern Territories',
-    'tg': 'Togo',
-    'th': 'Thailand',
-    'tj': 'Tajikistan',
-    'tk': 'Tokelau',
-    'tl': 'Timor-Leste',
-    'tm': 'Turkmenistan',
-    'tn': 'Tunisia',
-    'to': 'Tonga',
-    'tr': 'Turkey',
-    'tt': 'Trinidad and Tobago',
-    'tv': 'Tuvalu',
-    'tw': 'Taiwan',
-    'tz': 'Tanzania',
-    'ua': 'Ukraine',
-    'ug': 'Uganda',
-    'um': 'United States Minor Outlying Islands',
-    'us': 'United States',
-    'uy': 'Uruguay',
-    'uz': 'Uzbekistan',
-    'va': 'Vatican City',
-    'vc': 'Saint Vincent and the Grenadines',
-    've': 'Venezuela',
-    'vg': 'British Virgin Islands',
-    'vi': 'U.S. Virgin Islands',
-    'vn': 'Vietnam',
-    'vu': 'Vanuatu',
-    'wf': 'Wallis and Futuna',
-    'ws': 'Samoa',
-    'ye': 'Yemen',
-    'yt': 'Mayotte',
-    'za': 'South Africa',
-    'zm': 'Zambia',
-    'zw': 'Zimbabwe'
-  };
-  
-  return countryNames[code.toLowerCase()] || code.toUpperCase();
+  try {
+    const displayNames = new Intl.DisplayNames(['en'], { type: 'region' });
+    return displayNames.of(code.toUpperCase()) ?? code.toUpperCase();
+  } catch {
+    return code.toUpperCase();
+  }
 };
 
 const MapContainer = styled.div`
@@ -401,13 +155,16 @@ const JSVectorMapComponent: React.FC<JSVectorMapProps> = ({
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
   const currentlySelectedRef = useRef<string | null>(null);
-  const [mousePosition, setMousePosition] = useState<{ x: number, y: number }>({ x: 0, y: 0 });
+  // Track mouse position in a ref to avoid triggering re-renders on every mousemove
+  const mousePositionRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const [customTooltip, setCustomTooltip] = useState<{
     visible: boolean;
-    content: string;
+    countryName: string;
+    countryCode: string;
+    flagUrl: string;
     x: number;
     y: number;
-  }>({ visible: false, content: '', x: 0, y: 0 });
+  }>({ visible: false, countryName: '', countryCode: '', flagUrl: '', x: 0, y: 0 });
 
 
 
@@ -415,7 +172,7 @@ const JSVectorMapComponent: React.FC<JSVectorMapProps> = ({
     const currentMapRef = mapRef.current;
     if (!currentMapRef) return;
 
-    // Add mouse move listener to track cursor position
+    // Track cursor position; only trigger a re-render when the tooltip is shown
     const handleMouseMove = (e: MouseEvent) => {
       const rect = currentMapRef?.getBoundingClientRect();
       if (rect) {
@@ -423,16 +180,13 @@ const JSVectorMapComponent: React.FC<JSVectorMapProps> = ({
           x: e.clientX - rect.left,
           y: e.clientY - rect.top
         };
-        setMousePosition(newPosition);
-        
-        // Update tooltip position if it's visible
-        if (customTooltip.visible) {
-          setCustomTooltip(prev => ({
-            ...prev,
-            x: newPosition.x,
-            y: newPosition.y
-          }));
-        }
+        mousePositionRef.current = newPosition;
+
+        // Only update React state (and re-render) if the tooltip is currently visible
+        setCustomTooltip(prev => {
+          if (!prev.visible) return prev;
+          return { ...prev, x: newPosition.x, y: newPosition.y };
+        });
       }
     };
 
@@ -451,12 +205,6 @@ const JSVectorMapComponent: React.FC<JSVectorMapProps> = ({
     currentMapRef.innerHTML = '';
 
     try {
-      console.log(`🗺️ Initializing jsVectorMap with handlers:`, {
-        onCountryClick: !!onCountryClick,
-        onCountryHover: !!onCountryHover,
-        onCountryLeave: !!onCountryLeave
-      });
-      
       // Create new map instance
       mapInstance.current = new jsVectorMap({
         selector: currentMapRef,
@@ -495,12 +243,8 @@ const JSVectorMapComponent: React.FC<JSVectorMapProps> = ({
         onRegionClick: (event: any, code: string) => {
           const countryName = getCountryName(code);
           const countryCode = code.toLowerCase();
-          console.log(`🖱️ Region clicked: ${code}, Country: ${countryName}`);
-          console.log(`🎯 Setting currentlySelected to: ${countryCode}`);
-          
+
           currentlySelectedRef.current = countryCode;
-          
-          console.log(`✅ State and ref updated, ref value: ${currentlySelectedRef.current}`);
           
           // Immediately apply styling to clicked region
           const regions = mapInstance.current?.regions;
@@ -532,8 +276,6 @@ const JSVectorMapComponent: React.FC<JSVectorMapProps> = ({
               element.style.fillOpacity = '0.9';
               element.style.stroke = '#3b82f6';
               element.style.strokeWidth = '1.5';
-              console.log(`🎨 Immediately applied styling (attrs + style) to clicked region: ${countryCode}`);
-              console.log(`🔍 Element fill attr: ${element.getAttribute('fill')}, style.fill: ${element.style.fill}`);
             }
           }
           
@@ -542,27 +284,23 @@ const JSVectorMapComponent: React.FC<JSVectorMapProps> = ({
           }
         },
         onRegionTooltipShow: (event: any, tooltip: any, code: string) => {
-          console.log(`🟢 Region hover event triggered for: ${code}`);
           const countryName = getCountryName(code);
           const flagUrl = iso3166Service.getCountryFlagUrl(code.toUpperCase());
-          
+
           // Hide the default tooltip
           if (tooltip && tooltip.element) {
             tooltip.element.style.display = 'none';
           }
-          
-          // CRITICAL: Prevent hover from changing selected region's styling
+
+          // Prevent hover from overriding the selected region's styling
           const selected = currentlySelectedRef.current;
-          console.log(`📌 Current selection ref: ${selected}, Hovering: ${code.toLowerCase()}`);
-          
+
           if (selected) {
             const regions = mapInstance.current?.regions;
             if (regions) {
-              // Force restore selected region styling immediately
               const selectedRegion = regions[selected];
               if (selectedRegion && selectedRegion.element && selectedRegion.element.node) {
                 const element = selectedRegion.element.node;
-                // Set both attributes AND style properties
                 element.setAttribute('fill', '#60a5fa');
                 element.setAttribute('fill-opacity', '0.9');
                 element.setAttribute('stroke', '#3b82f6');
@@ -572,42 +310,29 @@ const JSVectorMapComponent: React.FC<JSVectorMapProps> = ({
                 element.style.fillOpacity = '0.9';
                 element.style.stroke = '#3b82f6';
                 element.style.strokeWidth = '1.5';
-                console.log(`🔒 Locked selection styling (attrs + style) for: ${selected}`);
               }
             }
           }
-          
-          // Create tooltip content
-          const tooltipContent = `
-            <img src="${flagUrl}" alt="${countryName} flag" style="width: 24px; height: 24px; margin-bottom: 4px; border-radius: 4px; object-fit: cover;" onerror="this.style.display='none'"/><br/>
-            <strong>${countryName}</strong><br/>
-            <small>Code: ${code.toUpperCase()}</small><br/>
-            <small>Click to view subdivisions</small>
-          `;
-          
-          // Position tooltip at current mouse position
-          const x = mousePosition.x;
-          const y = mousePosition.y;
-          
-          console.log(`📍 Showing custom tooltip at mouse position: ${x}, ${y}`);
-          
+
+          // Show structured tooltip at the current tracked mouse position
+          const { x, y } = mousePositionRef.current;
           setCustomTooltip({
             visible: true,
-            content: tooltipContent,
-            x: x,
-            y: y
+            countryName,
+            countryCode: code.toUpperCase(),
+            flagUrl,
+            x,
+            y
           });
-          
+
           if (onCountryHover) {
-            console.log(`🟡 Calling onCountryHover for: ${code} (${countryName})`);
             onCountryHover(code.toUpperCase(), countryName);
           }
         },
         onRegionOut: () => {
-          console.log(`🔴 Region out event triggered`);
-          setCustomTooltip({ visible: false, content: '', x: 0, y: 0 });
-          
-          // Immediately restore selected region styling if one is selected
+          setCustomTooltip({ visible: false, countryName: '', countryCode: '', flagUrl: '', x: 0, y: 0 });
+
+          // Restore selected region styling after hover resets it
           setTimeout(() => {
             const selected = currentlySelectedRef.current;
             if (selected && mapInstance.current?.regions) {
@@ -616,7 +341,6 @@ const JSVectorMapComponent: React.FC<JSVectorMapProps> = ({
               if (selectedRegion && selectedRegion.element && selectedRegion.element.node) {
                 const element = selectedRegion.element.node;
                 if (element.getAttribute('data-selected') === 'true') {
-                  // Set both attributes AND style properties
                   element.setAttribute('fill', '#60a5fa');
                   element.setAttribute('fill-opacity', '0.9');
                   element.setAttribute('stroke', '#3b82f6');
@@ -625,21 +349,17 @@ const JSVectorMapComponent: React.FC<JSVectorMapProps> = ({
                   element.style.fillOpacity = '0.9';
                   element.style.stroke = '#3b82f6';
                   element.style.strokeWidth = '1.5';
-                  console.log(`🔧 Restored selection styling (attrs + style) for: ${selected}`);
                 }
               }
             }
           }, 10);
-          
+
           if (onCountryLeave) {
-            console.log(`🟠 Calling onCountryLeave`);
             onCountryLeave();
           }
         }
       });
 
-      console.log('jsVectorMap instance created successfully:', mapInstance.current);
-      
     } catch (error) {
       console.error('Error creating jsVectorMap instance:', error);
     }
@@ -664,22 +384,14 @@ const JSVectorMapComponent: React.FC<JSVectorMapProps> = ({
 
   // Update selected regions when props change (dropdown selection)
   useEffect(() => {
-    console.log(`🎯 JSVectorMapComponent: selectedCountry prop changed to: ${selectedCountry}`);
-    console.log(`📍 Map instance exists: ${!!mapInstance.current}`);
-    console.log(`📍 Regions exist: ${!!(mapInstance.current?.regions)}`);
-    
     if (!mapInstance.current || !mapInstance.current.regions) {
-      console.warn(`⚠️ Map instance or regions not ready yet`);
       return;
     }
 
     const timeoutId = setTimeout(() => {
       try {
-        console.log(`🔄 Applying external selection: ${selectedCountry}`);
-        
         const regions = mapInstance.current.regions;
-        console.log(`📊 Available regions count: ${Object.keys(regions).length}`);
-        
+
         // Reset all regions to initial state
         Object.keys(regions).forEach(regionCode => {
           const region = regions[regionCode];
@@ -692,13 +404,10 @@ const JSVectorMapComponent: React.FC<JSVectorMapProps> = ({
             element.removeAttribute('data-selected');
           }
         });
-        
+
         // Apply selected styling to the selected country
         if (selectedCountry) {
           const countryCode = selectedCountry.toLowerCase();
-          console.log(`🔍 Looking for region with code: ${countryCode}`);
-          console.log(`🔍 Available regions include: ${Object.keys(regions).slice(0, 10).join(', ')}...`);
-          
           const selectedRegion = regions[countryCode];
           if (selectedRegion && selectedRegion.element && selectedRegion.element.node) {
             const element = selectedRegion.element.node;
@@ -707,20 +416,15 @@ const JSVectorMapComponent: React.FC<JSVectorMapProps> = ({
             element.setAttribute('stroke', '#3b82f6');
             element.setAttribute('stroke-width', '1.5');
             element.setAttribute('data-selected', 'true');
-            console.log(`✅ Successfully applied selection styling to: ${countryCode}`);
             currentlySelectedRef.current = countryCode;
           } else {
-            console.error(`❌ Could not find region for code: ${countryCode}`);
-            console.log(`Available regions: ${Object.keys(regions).join(', ')}`);
-
             currentlySelectedRef.current = null;
           }
         } else {
-          console.log(`ℹ️ No country selected, clearing selection`);
           currentlySelectedRef.current = null;
         }
       } catch (error) {
-        console.error(`❌ Failed to update region selection:`, error);
+        console.error('Failed to update region selection:', error);
       }
     }, 100);
 
@@ -752,23 +456,35 @@ const JSVectorMapComponent: React.FC<JSVectorMapProps> = ({
             element.style.fillOpacity = '0.9';
             element.style.stroke = '#3b82f6';
             element.style.strokeWidth = '1.5';
-            console.log(`🔄 Restored selection styling (attrs + style) in interval for: ${selected}`);
           }
         }
       }
-    }, 16); // Run at ~60fps for immediate response
+    }, 100); // 100ms is sufficient to detect and correct hover overrides
 
     return () => clearInterval(interval);
   }, []); // Run continuously, not dependent on currentlySelected
 
   return (
     <MapContainer ref={mapRef}>
-      <CustomTooltip
-        $visible={customTooltip.visible}
-        $x={customTooltip.x}
-        $y={customTooltip.y}
-        dangerouslySetInnerHTML={{ __html: customTooltip.content }}
-      />
+      {/* Render tooltip as structured JSX — avoids dangerouslySetInnerHTML XSS risk */}
+      <CustomTooltip $visible={customTooltip.visible} $x={customTooltip.x} $y={customTooltip.y}>
+        {customTooltip.visible && (
+          <>
+            <img
+              src={customTooltip.flagUrl}
+              alt={`${customTooltip.countryName} flag`}
+              style={{ width: 24, height: 24, marginBottom: 4, borderRadius: 4, objectFit: 'cover' as const }}
+              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+            />
+            <br />
+            <strong>{customTooltip.countryName}</strong>
+            <br />
+            <small>Code: {customTooltip.countryCode}</small>
+            <br />
+            <small>Click to view subdivisions</small>
+          </>
+        )}
+      </CustomTooltip>
     </MapContainer>
   );
 };

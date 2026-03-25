@@ -16,11 +16,10 @@ describe('CountryDropdown', () => {
   });
 
   it('opens dropdown list when button is clicked', async () => {
-    const user = userEvent.setup();
     render(<CountryDropdown onCountrySelect={mockOnCountrySelect} />);
     
     const button = screen.getByRole('button');
-    await user.click(button);
+    userEvent.click(button);
     
     // Check if dropdown items are visible
     const countryItems = screen.getAllByRole('button');
@@ -28,36 +27,33 @@ describe('CountryDropdown', () => {
   });
 
   it('closes dropdown when a country is selected', async () => {
-    const user = userEvent.setup();
     render(<CountryDropdown onCountrySelect={mockOnCountrySelect} />);
     
     const button = screen.getByRole('button');
-    await user.click(button);
+    userEvent.click(button);
     
     // Find and click a country option
     const countryOptions = screen.getAllByRole('button');
     if (countryOptions.length > 1) {
-      await user.click(countryOptions[1]);
+      userEvent.click(countryOptions[1]);
       expect(mockOnCountrySelect).toHaveBeenCalled();
     }
   });
 
   it('filters countries by search term', async () => {
-    const user = userEvent.setup();
     render(<CountryDropdown onCountrySelect={mockOnCountrySelect} />);
     
     const button = screen.getByRole('button');
-    await user.click(button);
+    userEvent.click(button);
     
     const searchInput = screen.getByPlaceholderText(/search/i);
-    await user.type(searchInput, 'United');
+    userEvent.type(searchInput, 'United');
     
     // Search input should contain typed text
     expect(searchInput).toHaveValue('United');
   });
 
   it('displays selected country name after selection', async () => {
-    const user = userEvent.setup();
     const { rerender } = render(
       <CountryDropdown 
         onCountrySelect={mockOnCountrySelect}
@@ -77,15 +73,13 @@ describe('CountryDropdown', () => {
   });
 
   it('calls onCountrySelect with correct parameters', async () => {
-    const user = userEvent.setup();
     render(<CountryDropdown onCountrySelect={mockOnCountrySelect} />);
     
     const button = screen.getByRole('button');
-    await user.click(button);
+    userEvent.click(button);
   });
 
   it('has clear button when country is selected', async () => {
-    const user = userEvent.setup();
     const { rerender } = render(
       <CountryDropdown onCountrySelect={mockOnCountrySelect} />
     );

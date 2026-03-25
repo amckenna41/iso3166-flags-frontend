@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import styled from 'styled-components';
 import { ChevronLeft, ChevronRight, X, AlertCircle } from 'lucide-react';
 import { iso3166Service, CountryData } from '../services/iso3166Service';
@@ -9,6 +9,7 @@ import SearchComponent from './SearchComponent';
 import CountryDropdown from './CountryDropdown';
 import SubdivisionDropdown from './SubdivisionDropdown';
 import JSVectorMapComponent from './JSVectorMapComponent';
+import APP_CONFIG from '../config/appConfig';
 
 const MapWrapper = styled.div`
   display: flex;
@@ -271,24 +272,25 @@ const InteractiveMap: React.FC<InteractiveMapProps> = () => {
   const [lastRetryAction, setLastRetryAction] = useState<(() => Promise<void>) | null>(null);
   const [infoPanelCollapsed, setInfoPanelCollapsed] = useState(false);
 
-  // Debug: Log state changes
-  console.log('🔍 InteractiveMap state:', { 
-    selectedCountry, 
-    selectedCountryName, 
-    selectedCountryDataKeys: selectedCountryData ? Object.keys(selectedCountryData).length : 0,
-    loading,
-    error
-  });
+  // Tracks whether the URL has been parsed on initial mount
+  const urlInitialized = useRef(false);
 
-  // Debug: Track selectedCountry changes
+  // Sync selected country and subdivision to the URL query string.
+  // Skip on first render so the URL restore effect can read the initial URL params first.
   useEffect(() => {
-    console.log(`🔔 InteractiveMap: selectedCountry state changed to: "${selectedCountry}"`);
-  }, [selectedCountry]);
-
+    if (!urlInitialized.current) return;
+    const params = new URLSearchParams();
+    if (selectedCountry) params.set('country', selectedCountry.toUpperCase());
+    if (highlightedSubdivision) params.set('subdivision', highlightedSubdivision);
+    const search = params.toString();
+    window.history.replaceState(
+      null,
+      '',
+      search ? `?${search}` : window.location.pathname
+    );
+  }, [selectedCountry, highlightedSubdivision]);
 
   const handleCountryClick = useCallback(async (countryCode: string, countryName: string) => {
-    console.log(`🚀 handleCountryClick called with: ${countryCode}, ${countryName}`);
-    
     // Store retry action for error states
     const retryFn = async () => {
       await handleCountryClick(countryCode, countryName);
@@ -296,63 +298,49 @@ const InteractiveMap: React.FC<InteractiveMapProps> = () => {
     setLastRetryAction(() => retryFn);
     
     try {
-      console.log(`📡 Setting loading state and clearing previous data`);
       setLoading(true);
       setError(null);
       setIsErrorRetryable(false);
-      console.log(`🎯 SETTING selectedCountry STATE to: ${countryCode}`);
       setSelectedCountry(countryCode);
       setSelectedCountryName(countryName);
       setHighlightedSubdivision(null); // Clear subdivision highlight when directly clicking country
       setSelectedCountryData(null); // Clear previous data immediately
       setInfoPanelCollapsed(false); // Auto-expand panel when country is selected
       
-      console.log(`🌍 Fetching subdivision data for: ${countryCode.toLowerCase()}`);
       const subdivisionData = await iso3166Service.getCountrySubdivisions(countryCode.toLowerCase());
-      console.log(`✅ Received subdivision data:`, subdivisionData);
-      console.log(`📊 Number of subdivisions:`, Object.keys(subdivisionData || {}).length);
-      console.log(`� First few keys:`, Object.keys(subdivisionData || {}).slice(0, 3));
-      console.log(`�🔄 Setting selectedCountryData...`);
       setSelectedCountryData(subdivisionData);
-      console.log(`✨ State update completed - data is:`, subdivisionData ? 'not null' : 'null');
     } catch (err) {
-      console.error('❌ Error loading country data:', err);
+      console.error('Error loading country data:', err);
       const { message, isRetryable } = getErrorMessage(err);
       setError(message);
       setIsErrorRetryable(isRetryable);
     } finally {
-      console.log(`🏁 Setting loading to false`);
       setLoading(false);
     }
   }, []);
 
-  const handleCountryHover = useCallback((countryCode: string, countryName: string) => {
-    console.log(`🎯 InteractiveMap handleCountryHover called: ${countryCode} (${countryName})`);
+  const handleCountryHover = useCallback((countryCode: string, _countryName: string) => {
     setHoveredCountry(countryCode);
   }, []);
 
   const handleCountryLeave = useCallback(() => {
-    console.log(`🚪 InteractiveMap handleCountryLeave called`);
     setHoveredCountry(null);
   }, []);
 
-  const handleSubdivisionSelect = useCallback(async (subdivisionCode: string, subdivisionName: string) => {
-    console.log(`🏛️ handleSubdivisionSelect called with: ${subdivisionCode}, ${subdivisionName}`);
-    
+  const handleSubdivisionSelect = useCallback(async (subdivisionCode: string, _subdivisionName: string) => {
     // Auto-expand panel when subdivision is selected
     setInfoPanelCollapsed(false);
     
     // If we already have the country data loaded, just highlight the subdivision
     if (selectedCountryData && selectedCountryData[subdivisionCode]) {
       setHighlightedSubdivision(subdivisionCode);
-      console.log(`✨ Highlighted subdivision: ${subdivisionCode}`);
     } else {
       // If we don't have the data, extract country code and load the data
       const countryCode = subdivisionCode.split('-')[0];
       const countryName = selectedCountryName || countryCode.toUpperCase();
       
       const retryFn = async () => {
-        await handleSubdivisionSelect(subdivisionCode, subdivisionName);
+        await handleSubdivisionSelect(subdivisionCode, _subdivisionName);
       };
       setLastRetryAction(() => retryFn);
       
@@ -366,10 +354,8 @@ const InteractiveMap: React.FC<InteractiveMapProps> = () => {
         
         const subdivisionData = await iso3166Service.getCountrySubdivisions(countryCode.toLowerCase());
         setSelectedCountryData(subdivisionData);
-        
-        console.log(`✨ Loaded country data and highlighted subdivision: ${subdivisionCode}`);
       } catch (err) {
-        console.error('❌ Error loading subdivision data:', err);
+        console.error('Error loading subdivision data:', err);
         const { message, isRetryable } = getErrorMessage(err);
         setError(message);
         setIsErrorRetryable(isRetryable);
@@ -379,7 +365,24 @@ const InteractiveMap: React.FC<InteractiveMapProps> = () => {
     }
   }, [selectedCountryData, selectedCountryName]);
 
-  const handleSearchResult = async (countryCode: string, subdivisionName: string, subdivisionCode?: string) => {
+  // Restore state from URL params on first render
+  useEffect(() => {
+    if (urlInitialized.current) return;
+    urlInitialized.current = true;
+
+    const params = new URLSearchParams(window.location.search);
+    const countryParam = params.get('country');
+    const subdivisionParam = params.get('subdivision');
+
+    if (countryParam) {
+      // Use the country code as a placeholder name — CountryInfo will resolve the real name
+      handleCountryClick(countryParam.toUpperCase(), countryParam.toUpperCase()).then(() => {
+        if (subdivisionParam) setHighlightedSubdivision(subdivisionParam);
+      });
+    }
+  }, [handleCountryClick]);
+
+  const handleSearchResult = useCallback(async (countryCode: string, subdivisionName: string, subdivisionCode?: string) => {
     // When a subdivision is selected from search, load the country data and highlight the subdivision
     const retryFn = async () => {
       await handleSearchResult(countryCode, subdivisionName, subdivisionCode);
@@ -405,7 +408,9 @@ const InteractiveMap: React.FC<InteractiveMapProps> = () => {
     } finally {
       setLoading(false);
     }
-  };
+  // All state setters from useState are stable; no external deps needed
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <>
@@ -422,7 +427,7 @@ const InteractiveMap: React.FC<InteractiveMapProps> = () => {
             />
           </div>
 
-          {selectedCountry && (
+          {selectedCountry && APP_CONFIG.features.enableSearch && (
             <SearchComponent
               onResultSelect={handleSearchResult}
               subdivisionDropdownVisible={true}
@@ -505,7 +510,6 @@ const InteractiveMap: React.FC<InteractiveMapProps> = () => {
               countryCode={selectedCountry}
               highlightedSubdivision={highlightedSubdivision}
               onClose={() => {
-                console.log('Closing country info panel');
                 setSelectedCountry(null);
                 setSelectedCountryName(null);
                 setSelectedCountryData(null);

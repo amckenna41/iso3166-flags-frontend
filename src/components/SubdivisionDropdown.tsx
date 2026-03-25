@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import styled from 'styled-components';
+import styled, { keyframes } from 'styled-components';
 import { ChevronDown, MapPin, Loader } from 'lucide-react';
-import { iso3166Service } from '../services/iso3166Service';
+import { iso3166Service, SubdivisionData } from '../services/iso3166Service';
 
 const DropdownContainer = styled.div<{ $visible: boolean }>`
   position: absolute;
@@ -223,22 +223,22 @@ const LoadingContainer = styled.div`
   font-size: 14px;
 `;
 
+const spin = keyframes`
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+`;
+
+// Animated spinner using styled-components keyframes (Tailwind is not available)
+const SpinningLoader = styled(Loader)`
+  animation: ${spin} 1s linear infinite;
+`;
+
 const NoDataContainer = styled.div`
   padding: 20px;
   text-align: center;
   color: #999;
   font-size: 14px;
 `;
-
-interface SubdivisionData {
-  code: string;
-  name: string;
-  type: string;
-  localOtherName?: string;
-  latLng: [number, number];
-  flag: string;
-  history?: any;
-}
 
 interface SubdivisionDropdownProps {
   selectedCountryCode: string | null;
@@ -332,6 +332,8 @@ const SubdivisionDropdown: React.FC<SubdivisionDropdownProps> = ({
       <DropdownButton
         onClick={handleToggle}
         disabled={!selectedCountryCode || loading || subdivisions.length === 0}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
       >
         <ButtonContent>
           <MapPin size={16} color="#666" />
@@ -349,7 +351,7 @@ const SubdivisionDropdown: React.FC<SubdivisionDropdownProps> = ({
           </CountText>
         )}
         {loading ? (
-          <Loader size={16} className="animate-spin" />
+          <SpinningLoader size={16} />
         ) : (
           <ChevronIcon 
             $isOpen={isOpen} 
@@ -371,7 +373,7 @@ const SubdivisionDropdown: React.FC<SubdivisionDropdownProps> = ({
             <DropdownList>
               {loading ? (
                 <LoadingContainer>
-                  <Loader size={16} className="animate-spin" />
+                  <SpinningLoader size={16} />
                   Loading subdivisions...
                 </LoadingContainer>
               ) : filteredSubdivisions.length > 0 ? (

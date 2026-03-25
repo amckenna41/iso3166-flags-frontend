@@ -492,7 +492,7 @@ const CountryDropdown: React.FC<CountryDropdownProps> = ({
 
   return (
     <DropdownContainer data-dropdown="country-dropdown">
-      <DropdownButton onClick={handleToggle}>
+      <DropdownButton onClick={handleToggle} data-testid="country-dropdown-trigger" aria-haspopup="listbox" aria-expanded={isOpen}>
         <ButtonContent>
           {selectedCountryName !== 'Select a country' ? (
             <FlagImage 
@@ -517,7 +517,7 @@ const CountryDropdown: React.FC<CountryDropdownProps> = ({
         </ButtonContent>
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
           {selectedCountryName !== 'Select a country' && (
-            <ClearButton onClick={handleClear} title="Clear selection">
+            <ClearButton onClick={handleClear} title="Clear selection" data-testid="country-dropdown-clear">
               <X size={16} />
             </ClearButton>
           )}
@@ -525,18 +525,20 @@ const CountryDropdown: React.FC<CountryDropdownProps> = ({
         </div>
       </DropdownButton>
       
-      <DropdownList isOpen={isOpen}>
+      <DropdownList isOpen={isOpen} data-testid="country-dropdown-list">
         <SearchInput
           type="text"
           placeholder="Type to search countries..."
           value={searchTerm}
           onChange={handleSearchChange}
           onClick={(e) => e.stopPropagation()}
+          data-testid="country-dropdown-search"
         />
         {filteredCountries.map((country) => (
           <DropdownItem
             key={country.code}
             onClick={() => handleCountryClick(country)}
+            data-testid={`country-option-${country.code}`}
           >
             <FlagImage 
               src={iso3166Service.getCountryFlagUrl(country.code)} 

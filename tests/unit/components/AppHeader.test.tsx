@@ -18,10 +18,10 @@ describe('AppHeader', () => {
   it('renders navigation links', () => {
     render(<AppHeader />);
     const flags_link = screen.getByText(/Flags Dataset/i);
-    const updates_link = screen.getByText(/Updates/i);
+    const subdivision_link = screen.getByText(/Subdivision Data/i);
     
     expect(flags_link).toBeInTheDocument();
-    expect(updates_link).toBeInTheDocument();
+    expect(subdivision_link).toBeInTheDocument();
   });
 
   it('has correct href for GitHub link', () => {
@@ -33,17 +33,17 @@ describe('AppHeader', () => {
   it('renders info button', () => {
     const mockOnInfoClick = jest.fn();
     render(<AppHeader onInfoClick={mockOnInfoClick} />);
-    const infoButton = screen.getByRole('button', { name: /Info/i });
+    // The button renders the text 'About' (with an Info icon)
+    const infoButton = screen.getByRole('button', { name: /About/i });
     expect(infoButton).toBeInTheDocument();
   });
 
   it('calls onInfoClick when info button is clicked', async () => {
-    const user = userEvent.setup();
     const mockOnInfoClick = jest.fn();
     render(<AppHeader onInfoClick={mockOnInfoClick} />);
     
-    const infoButton = screen.getByRole('button', { name: /Info/i });
-    await user.click(infoButton);
+    const infoButton = screen.getByRole('button', { name: /About/i });
+    userEvent.click(infoButton);
     
     expect(mockOnInfoClick).toHaveBeenCalled();
   });
