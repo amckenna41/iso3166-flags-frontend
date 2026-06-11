@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import styled from 'styled-components';
-import { ChevronLeft, ChevronRight, X, AlertCircle } from 'lucide-react';
+import styled, { keyframes } from 'styled-components';
+import { ChevronLeft, ChevronRight, X, AlertCircle, Loader } from 'lucide-react';
 import { iso3166Service, CountryData } from '../services/iso3166Service';
 import { getErrorMessage } from '../utils/errorHandler';
 import CountryInfo from './CountryInfo';
@@ -11,17 +11,32 @@ import SubdivisionDropdown from './SubdivisionDropdown';
 import JSVectorMapComponent from './JSVectorMapComponent';
 import APP_CONFIG from '../config/appConfig';
 
+/** Height of the fixed AppHeader. Must match AppHeader's min-height. */
+const HEADER_HEIGHT = 62;
+
+const spin = keyframes`
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+`;
+
+const SpinningLoader = styled(Loader)`
+  animation: ${spin} 1s linear infinite;
+  color: #667eea;
+`;
+
 const MapWrapper = styled.div`
   display: flex;
   height: 100vh;
   width: 100%;
 `;
 
+MapWrapper.defaultProps = { 'data-testid': 'interactive-map' } as any;
+
 const MapSection = styled.div`
   flex: 1;
   position: relative;
-  padding-top: 62px; /* Account for header height */
-  height: calc(100vh - 62px);
+  padding-top: ${HEADER_HEIGHT}px;
+  height: calc(100vh - ${HEADER_HEIGHT}px);
   overflow: hidden;
   min-width: 0; /* Ensures proper flex behavior */
   pointer-events: auto;
@@ -291,6 +306,16 @@ const InteractiveMap: React.FC<InteractiveMapProps> = () => {
   }, [selectedCountry, highlightedSubdivision]);
 
   const handleCountryClick = useCallback(async (countryCode: string, countryName: string) => {
+    // Guard: empty code means the user cleared the country dropdown
+    if (!countryCode.trim()) {
+      setSelectedCountry(null);
+      setSelectedCountryName(null);
+      setSelectedCountryData(null);
+      setHighlightedSubdivision(null);
+      setError(null);
+      return;
+    }
+
     // Store retry action for error states
     const retryFn = async () => {
       await handleCountryClick(countryCode, countryName);
@@ -374,7 +399,8 @@ const InteractiveMap: React.FC<InteractiveMapProps> = () => {
     const countryParam = params.get('country');
     const subdivisionParam = params.get('subdivision');
 
-    if (countryParam) {
+    // Validate country code: must be exactly 2 uppercase ASCII letters (ISO 3166-1 alpha-2)
+    if (countryParam && /^[A-Za-z]{2}$/.test(countryParam)) {
       // Use the country code as a placeholder name — CountryInfo will resolve the real name
       handleCountryClick(countryParam.toUpperCase(), countryParam.toUpperCase()).then(() => {
         if (subdivisionParam) setHighlightedSubdivision(subdivisionParam);
@@ -394,7 +420,15 @@ const InteractiveMap: React.FC<InteractiveMapProps> = () => {
       setError(null);
       setIsErrorRetryable(false);
       setSelectedCountry(countryCode);
-      setSelectedCountryName(subdivisionName); // Use subdivision name for context
+      // Resolve the proper country name from the ISO code using the browser's built-in API
+      let resolvedCountryName: string;
+      try {
+        const displayNames = new Intl.DisplayNames(['en'], { type: 'region' });
+        resolvedCountryName = displayNames.of(countryCode.toUpperCase()) ?? countryCode.toUpperCase();
+      } catch {
+        resolvedCountryName = countryCode.toUpperCase();
+      }
+      setSelectedCountryName(resolvedCountryName);
       setHighlightedSubdivision(subdivisionCode || null); // Set the subdivision to highlight
       setInfoPanelCollapsed(false); // Auto-expand panel when search result is selected
       
@@ -414,10 +448,10 @@ const InteractiveMap: React.FC<InteractiveMapProps> = () => {
 
   return (
     <>
-      <AppHeader />
+      <AppHeader onInfoClick={() => setInfoPanelCollapsed(false)} />
       <MapWrapper>
         <MapSection>
-            <div style={{ width: '100%', height: '100%', position: 'absolute', top: '62px', left: 0, right: 0, bottom: 0, pointerEvents: 'auto' }}>
+            <div style={{ width: '100%', height: '100%', position: 'absolute', top: `${HEADER_HEIGHT}px`, left: 0, right: 0, bottom: 0, pointerEvents: 'auto' }}>
             <JSVectorMapComponent
               onCountryClick={handleCountryClick}
               onCountryHover={handleCountryHover}
@@ -448,7 +482,7 @@ const InteractiveMap: React.FC<InteractiveMapProps> = () => {
 
           {loading && (
             <LoadingOverlay>
-              <div>⏳</div>
+              <SpinningLoader size={20} />
               Loading country data...
             </LoadingOverlay>
           )}

@@ -8,12 +8,11 @@
 export const APP_CONFIG = {
   // Application information
   name: 'ISO 3166 Flags Explorer',
-  version: '1.0.0',
+  version: '0.1.0',
   
   // API Configuration — values come from environment variables (see .env.example)
   api: {
     iso3166_2: process.env.REACT_APP_ISO3166_2_API ?? 'https://iso3166-2-api.vercel.app/api',
-    restCountries: process.env.REACT_APP_REST_COUNTRIES_API ?? 'https://restcountries.com/v3.1',
   },
   
   // Data source URLs
@@ -35,7 +34,7 @@ export const APP_CONFIG = {
     // Toggle individual UI features without code changes
     enableExport: true,
     enableSearch: true,
-    enableUsageGuide: true,
+    enableUsageGuide: false,
   },
 };
 

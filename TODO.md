@@ -49,3 +49,5 @@
   - "Spanish regions near the coast"
   - "Find subdivisions with 'mountain' in local name"
   - "Regions in Asia with population > 10M"
+
+- [ ] Provide some validation or automation around ensuring the latest version of lipis/flag-icons and REST countries API.

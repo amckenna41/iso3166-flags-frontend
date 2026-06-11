@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import CountryDropdown from '../../../src/components/CountryDropdown';
 
@@ -54,43 +54,43 @@ describe('CountryDropdown', () => {
   });
 
   it('displays selected country name after selection', async () => {
-    const { rerender } = render(
-      <CountryDropdown 
+    render(
+      <CountryDropdown
         onCountrySelect={mockOnCountrySelect}
         selectedCountry="US"
       />
     );
-    
-    rerender(
-      <CountryDropdown 
-        onCountrySelect={mockOnCountrySelect}
-        selectedCountry="US"
-      />
-    );
-    
-    // After selection, should show country info
-    // Note: actual country display depends on component implementation
+
+    await waitFor(() => {
+      expect(screen.getByTestId('country-dropdown-trigger')).toHaveTextContent('United States');
+    });
   });
 
   it('calls onCountrySelect with correct parameters', async () => {
     render(<CountryDropdown onCountrySelect={mockOnCountrySelect} />);
-    
+
     const button = screen.getByRole('button');
     userEvent.click(button);
+
+    const germanyOption = await screen.findByTestId('country-option-DE');
+    userEvent.click(germanyOption);
+
+    await waitFor(() => {
+      expect(mockOnCountrySelect).toHaveBeenCalledWith('DE', 'Germany');
+    });
   });
 
   it('has clear button when country is selected', async () => {
-    const { rerender } = render(
-      <CountryDropdown onCountrySelect={mockOnCountrySelect} />
-    );
-    
-    // With selected country
-    rerender(
-      <CountryDropdown 
+    render(
+      <CountryDropdown
         onCountrySelect={mockOnCountrySelect}
         selectedCountry="US"
       />
     );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('country-dropdown-clear')).toBeInTheDocument();
+    });
   });
 
   it('renders with accessibility attributes', () => {

@@ -4,7 +4,6 @@ import APP_CONFIG from '../config/appConfig';
 // Base URLs for the APIs and data sources
 const ISO3166_2_API_BASE = APP_CONFIG.api.iso3166_2;
 const FLAGS_BASE_URL = APP_CONFIG.data.flagsRepository;
-const REST_COUNTRIES_API = APP_CONFIG.api.restCountries;
 
 // Types for RestCountries API
 export interface RestCountryData {
@@ -19,8 +18,8 @@ export interface RestCountryData {
   region: string;
   subregion: string;
   capital: string[];
-  area: number;
-  population: number;
+  area?: number;
+  population?: number;
   timezones: string[];
   currencies: { [code: string]: { name: string; symbol: string } };
   languages: { [code: string]: string };
@@ -28,6 +27,13 @@ export interface RestCountryData {
     svg: string;
     png: string;
   };
+  landlocked?: boolean;
+  borders?: string[];
+  callingCodes?: string[];
+  tlds?: string[];
+  demonyms?: { [lang: string]: { f: string; m: string } };
+  memberships?: string[];
+  wikipedia?: string;
 }
 
 // Types for the data structures
@@ -58,26 +64,6 @@ export interface CountryFlags {
 
 export interface SearchResult {
   [countryCode: string]: CountryData;
-}
-
-// World countries GeoJSON data - we'll use a simplified version
-export interface CountryFeature {
-  type: 'Feature';
-  properties: {
-    NAME: string;
-    ISO_A2: string;
-    ISO_A3: string;
-    ISO_N3: string;
-  };
-  geometry: {
-    type: 'Polygon' | 'MultiPolygon';
-    coordinates: number[][][][];
-  };
-}
-
-export interface WorldGeoJSON {
-  type: 'FeatureCollection';
-  features: CountryFeature[];
 }
 
 interface CacheEntry<T> {
@@ -159,84 +145,82 @@ class ISO3166Service {
       return response.data;
     } catch (error) {
       console.error(`Error searching subdivisions for "${searchTerm}":`, error);
-      return {};
+      throw error;
     }
   }
 
-  // Get world countries GeoJSON (simplified version for demo)
-  async getWorldGeoJSON(): Promise<WorldGeoJSON> {
-    const cacheKey = 'world_geojson';
-    const cached = this.getCached<WorldGeoJSON>(cacheKey);
-    if (cached) return cached;
-
-    try {
-      const response = await axios.get(
-        'https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson',
-        { timeout: this.REQUEST_TIMEOUT_MS }
-      );
-      this.setCached(cacheKey, response.data);
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching world GeoJSON:', error);
-      return { type: 'FeatureCollection', features: [] };
-    }
-  }
-
-  // Get subdivision codes list for a country
-  async getSubdivisionCodes(countryCode: string): Promise<string[]> {
-    const cacheKey = `subdivision_codes_${countryCode}`;
-    const cached = this.getCached<string[]>(cacheKey);
-    if (cached) return cached;
-
-    try {
-      const response = await axios.get(`${ISO3166_2_API_BASE}/list_subdivisions/${countryCode}`, {
-        timeout: this.REQUEST_TIMEOUT_MS,
-      });
-      // The API returns an array of subdivision codes
-      const codes: string[] = Array.isArray(response.data) ? response.data : [];
-      this.setCached(cacheKey, codes);
-      return codes;
-    } catch (error) {
-      console.error(`Error fetching subdivision codes for ${countryCode}:`, error);
-      return [];
-    }
-  }
-
-  // Get all countries list
-  async getAllCountries(): Promise<{ [countryCode: string]: CountryData }> {
-    const cacheKey = 'all_countries';
-    const cached = this.getCached<{ [countryCode: string]: CountryData }>(cacheKey);
-    if (cached) return cached;
-
-    try {
-      const response = await axios.get(`${ISO3166_2_API_BASE}/all`, {
-        timeout: this.REQUEST_TIMEOUT_MS,
-      });
-      this.setCached(cacheKey, response.data);
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching all countries:', error);
-      return {};
-    }
-  }
-
-  // Get country information from RestCountries API
+  // Get country information via the internal /api/country-info proxy.
+  // The REST Countries API key never reaches the browser — it lives in the
+  // Vercel serverless function (api/country-info.js) / CRA dev proxy (setupProxy.js).
   async getCountryInfo(countryCode: string): Promise<RestCountryData | null> {
     const cacheKey = `country_info_${countryCode}`;
     const cached = this.getCached<RestCountryData>(cacheKey);
     if (cached) return cached;
 
     try {
-      const response = await axios.get(`${REST_COUNTRIES_API}/alpha/${countryCode}`, {
+      const response = await axios.get('/api/country-info', {
+        params: { code: countryCode },
         timeout: this.REQUEST_TIMEOUT_MS,
       });
-      if (response.data && response.data.length > 0) {
-        this.setCached(cacheKey, response.data[0]);
-        return response.data[0];
-      }
-      return null;
+
+      // v5 API wraps results as { data: { objects: [...] } }
+      const v5 = response.data?.data?.objects?.[0];
+      if (!v5) return null;
+
+      const countryData: RestCountryData = {
+        name: {
+          common: v5.names?.common ?? '',
+          official: v5.names?.official ?? '',
+        },
+        cca2: v5.codes?.alpha_2 ?? '',
+        cca3: v5.codes?.alpha_3 ?? '',
+        ccn3: v5.codes?.ccn3 ?? '',
+        region: v5.region ?? '',
+        subregion: v5.subregion ?? '',
+        capital: Array.isArray(v5.capitals)
+          ? v5.capitals.map((c: any) => c.name).filter(Boolean)
+          : [],
+        area: v5.area?.kilometers,
+        population: v5.population,
+        timezones: Array.isArray(v5.timezones) ? v5.timezones : [],
+        currencies: Array.isArray(v5.currencies)
+          ? v5.currencies.reduce((acc: any, c: any) => {
+              if (c.code) acc[c.code] = { name: c.name ?? '', symbol: c.symbol ?? '' };
+              return acc;
+            }, {})
+          : {},
+        languages: Array.isArray(v5.languages)
+          ? v5.languages.reduce((acc: any, l: any) => {
+              const key = l.iso639_1 ?? l.iso639_2b ?? l.name;
+              if (key) acc[key] = l.name ?? key;
+              return acc;
+            }, {})
+          : {},
+        flags: {
+          svg: v5.flag?.url_svg ?? '',
+          png: v5.flag?.url_png ?? '',
+        },
+        landlocked: v5.landlocked,
+        borders: Array.isArray(v5.borders) ? v5.borders : [],
+        callingCodes: (() => {
+          const raw = v5.phone?.calling_codes ?? v5.calling_codes;
+          if (!Array.isArray(raw)) return [];
+          return raw.map((c: any) => `+${String(c).trim()}`);
+        })(),
+        tlds: Array.isArray(v5.tlds) ? v5.tlds : [],
+        demonyms: v5.demonyms && typeof v5.demonyms === 'object' ? v5.demonyms : {},
+        memberships: (() => {
+          const raw = v5.memberships ?? v5.international_organizations;
+          if (!Array.isArray(raw)) return [];
+          return raw.map((m: any) => typeof m === 'string' ? m : (m.abbreviation ?? m.name ?? String(m)));
+        })(),
+        wikipedia: v5.links?.wikipedia ?? '',
+      };
+
+      this.setCached(cacheKey, countryData);
+      return countryData;
     } catch (error) {
-      console.error('Error fetching country info:', error);
+      console.error(`Error fetching country info for ${countryCode}:`, error);
       return null;
     }
   }

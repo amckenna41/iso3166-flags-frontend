@@ -402,6 +402,10 @@ const JSVectorMapComponent: React.FC<JSVectorMapProps> = ({
             element.setAttribute('stroke', '#cbd5e1');
             element.setAttribute('stroke-width', '0.5');
             element.removeAttribute('data-selected');
+            element.style.fill = '#e2e8f0';
+            element.style.fillOpacity = '0.8';
+            element.style.stroke = '#cbd5e1';
+            element.style.strokeWidth = '0.5';
           }
         });
 
@@ -416,12 +420,27 @@ const JSVectorMapComponent: React.FC<JSVectorMapProps> = ({
             element.setAttribute('stroke', '#3b82f6');
             element.setAttribute('stroke-width', '1.5');
             element.setAttribute('data-selected', 'true');
+            element.style.fill = '#60a5fa';
+            element.style.fillOpacity = '0.9';
+            element.style.stroke = '#3b82f6';
+            element.style.strokeWidth = '1.5';
             currentlySelectedRef.current = countryCode;
           } else {
             currentlySelectedRef.current = null;
           }
+
+          // Zoom map to the selected country
+          try {
+            mapInstance.current.setFocus({ region: selectedCountry.toLowerCase(), animate: true });
+          } catch (_) {
+            // setFocus unavailable or region not in map data — no-op
+          }
         } else {
           currentlySelectedRef.current = null;
+          // Zoom back to world view when selection is cleared
+          try {
+            mapInstance.current._setScale(mapInstance.current._baseScale, 0, 0, true, true);
+          } catch (_) {}
         }
       } catch (error) {
         console.error('Failed to update region selection:', error);

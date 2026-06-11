@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { ChevronDown, Globe, X } from 'lucide-react';
+import { ChevronDown, Globe, X, Clock, Star } from 'lucide-react';
 import { iso3166Service } from '../services/iso3166Service';
+import { FAVOURITES_KEY } from './CountryInfo';
+
+const RECENT_KEY = 'iso3166_recent_countries';
+const MAX_RECENT = 5;
 
 const DropdownContainer = styled.div`
   position: absolute;
@@ -29,34 +33,7 @@ const DropdownContainer = styled.div`
 const DropdownButton = styled.button`
   width: 100%;
   padding: 12px 16px;
-  background: rgba(255, 2  const handleCountryClick = (country: { code: string; name: string }) => {
-    setSelectedCountryName(country.name);
-    setIsOpen(false);
-    setSearchTerm('');
-    onCountrySelect(country.code, country.name);
-  };
-
-  const handleClear = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setSelectedCountryName('Select a country');
-    setSearchTerm('');
-    onCountrySelect('', '');
-  };
-
-  const handleToggle = () => {
-    setIsOpen(!isOpen);
-    if (!isOpen) {
-      setSearchTerm('');
-    }
-  };
-
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchTerm(e.target.value);
-  };
-
-  const filteredCountries = COUNTRIES.filter(country =>
-    country.name.toLowerCase().includes(searchTerm.toLowerCase())
-  ).sort((a, b) => a.name.localeCompare(b.name));0.95);
+  background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(10px);
   border: 1px solid #e0e0e0;
   border-radius: 8px;
@@ -86,7 +63,7 @@ const ButtonContent = styled.div`
   gap: 8px;
 `;
 
-const DropdownList = styled.div<{ isOpen: boolean }>`
+const DropdownList = styled.div<{ $isOpen: boolean }>`
   position: absolute;
   top: 100%;
   left: 0;
@@ -97,7 +74,7 @@ const DropdownList = styled.div<{ isOpen: boolean }>`
   border-radius: 8px;
   max-height: 300px;
   overflow-y: auto;
-  display: ${props => props.isOpen ? 'block' : 'none'};
+  display: ${props => props.$isOpen ? 'block' : 'none'};
   margin-top: 4px;
   z-index: 1001;
 `;
@@ -138,7 +115,7 @@ const FlagImage = styled.img`
   flex-shrink: 0;
 `;
 
-const ClearButton = styled.button`
+const ClearButton = styled.span`
   background: none;
   border: none;
   color: #999;
@@ -161,9 +138,9 @@ const ClearButton = styled.button`
   }
 `;
 
-const ChevronIcon = styled(ChevronDown)<{ isOpen: boolean }>`
+const ChevronIcon = styled(ChevronDown)<{ $isOpen: boolean }>`
   transition: transform 0.2s;
-  transform: ${props => props.isOpen ? 'rotate(180deg)' : 'rotate(0deg)'};
+  transform: ${props => props.$isOpen ? 'rotate(180deg)' : 'rotate(0deg)'};
 `;
 
 const SearchInput = styled.input`
@@ -183,6 +160,24 @@ const SearchInput = styled.input`
   &::placeholder {
     color: #999;
   }
+`;
+
+const RecentsLabel = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 16px 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #999;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+`;
+
+const RecentsDivider = styled.hr`
+  margin: 4px 0;
+  border: none;
+  border-top: 1px solid #f0f0f0;
 `;
 
 interface CountryDropdownProps {
@@ -424,19 +419,55 @@ const COUNTRIES = [
   { code: 'ZW', name: 'Zimbabwe' }
 ];
 
-const CountryDropdown: React.FC<CountryDropdownProps> = ({ 
-  onCountrySelect, 
-  selectedCountry 
+const CountryDropdown: React.FC<CountryDropdownProps> = ({
+  onCountrySelect,
+  selectedCountry
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedCountryName, setSelectedCountryName] = useState('Select a country');
   const [searchTerm, setSearchTerm] = useState('');
+  const [recentCountries, setRecentCountries] = useState<{ code: string; name: string }[]>(() => {
+    try {
+      const stored = localStorage.getItem(RECENT_KEY);
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [favouriteCountries, setFavouriteCountries] = useState<{ code: string; name: string }[]>(() => {
+    try {
+      const stored = localStorage.getItem(FAVOURITES_KEY);
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Stay in sync when CountryInfo toggles a favourite
+  useEffect(() => {
+    const refresh = () => {
+      try {
+        const stored = localStorage.getItem(FAVOURITES_KEY);
+        setFavouriteCountries(stored ? JSON.parse(stored) : []);
+      } catch {}
+    };
+    window.addEventListener('iso3166:favourites-changed', refresh);
+    return () => window.removeEventListener('iso3166:favourites-changed', refresh);
+  }, []);
 
   useEffect(() => {
     if (selectedCountry) {
       const country = COUNTRIES.find(c => c.code.toLowerCase() === selectedCountry.toLowerCase());
       if (country) {
         setSelectedCountryName(country.name);
+        // Update recently viewed list
+        setRecentCountries(prev => {
+          const filtered = prev.filter(c => c.code !== country.code);
+          const updated = [country, ...filtered].slice(0, MAX_RECENT);
+          try { localStorage.setItem(RECENT_KEY, JSON.stringify(updated)); } catch {}
+          return updated;
+        });
       }
     } else {
       setSelectedCountryName('Select a country');
@@ -517,15 +548,68 @@ const CountryDropdown: React.FC<CountryDropdownProps> = ({
         </ButtonContent>
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
           {selectedCountryName !== 'Select a country' && (
-            <ClearButton onClick={handleClear} title="Clear selection" data-testid="country-dropdown-clear">
+            <ClearButton
+              onClick={handleClear}
+              title="Clear selection"
+              data-testid="country-dropdown-clear"
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleClear(e as any); }}
+            >
               <X size={16} />
             </ClearButton>
           )}
-          <ChevronIcon size={16} isOpen={isOpen} />
+          <ChevronIcon size={16} $isOpen={isOpen} />
         </div>
       </DropdownButton>
       
-      <DropdownList isOpen={isOpen} data-testid="country-dropdown-list">
+      <DropdownList $isOpen={isOpen} data-testid="country-dropdown-list">
+        {favouriteCountries.length > 0 && !searchTerm && (
+          <>
+            <RecentsLabel>
+              <Star size={11} />
+              Favourites
+            </RecentsLabel>
+            {favouriteCountries.map(country => (
+              <DropdownItem
+                key={`fav-${country.code}`}
+                onClick={() => handleCountryClick(country)}
+              >
+                <FlagImage
+                  src={iso3166Service.getCountryFlagUrl(country.code)}
+                  alt={`${country.name} flag`}
+                  onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                />
+                {country.name}
+                <span style={{ color: '#999', fontSize: '12px', marginLeft: 'auto' }}>[{country.code}]</span>
+              </DropdownItem>
+            ))}
+            <RecentsDivider />
+          </>
+        )}
+        {recentCountries.length > 0 && !searchTerm && (
+          <>
+            <RecentsLabel>
+              <Clock size={11} />
+              Recent
+            </RecentsLabel>
+            {recentCountries.map(country => (
+              <DropdownItem
+                key={`recent-${country.code}`}
+                onClick={() => handleCountryClick(country)}
+              >
+                <FlagImage
+                  src={iso3166Service.getCountryFlagUrl(country.code)}
+                  alt={`${country.name} flag`}
+                  onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                />
+                {country.name}
+                <span style={{ color: '#999', fontSize: '12px', marginLeft: 'auto' }}>[{country.code}]</span>
+              </DropdownItem>
+            ))}
+            <RecentsDivider />
+          </>
+        )}
         <SearchInput
           type="text"
           placeholder="Type to search countries..."

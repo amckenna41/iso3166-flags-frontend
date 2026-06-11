@@ -7,8 +7,6 @@ Visit the ISO 3166 Flags Explorer here:
 
 <br>
 
-![ISO 3166 Flags Explorer Homepage](public/homepage-example.png)
-
 ## Features
 
 - **Interactive World Map**: Explore countries and regions with an interactive map interface. Zoom, pan, and click to learn more about countries and regions.
@@ -30,5 +28,5 @@ All application configuration is centralized in [`src/config/appConfig.ts`](src/
 - **Data Sources**: Flag repository URLs
 - **External Links**: References to datasets and repositories
 
-To modify API endpoints or data sources, edit the `src/config/appConfig.ts` file directly. No environment variables or `.env` file is required.
+API base URLs can be overridden via `REACT_APP_*` environment variables (see `.env.example`). If no `.env` file is present, `src/config/appConfig.ts` falls back to the public production endpoints, so no `.env` file is required for local development.
 - [ISO 3166-2 Dataset](https://github.com/iso3166-2) - ISO 3166-2 subdivision data

@@ -272,7 +272,7 @@ const ExportButton: React.FC<ExportButtonProps> = ({ country, subdivisions, coun
           onMouseLeave={() => setActiveSubmenu(null)}
         >
           <Download size={16} />
-          Export Subdivisions
+          Export Subdivisions ({subdivisions.length})
           <ChevronLeft size={14} className="chevron" />
 
           {activeSubmenu === 'subdivisions' && (

@@ -140,14 +140,17 @@ const SearchComponent: React.FC<SearchComponentProps> = ({ onResultSelect, subdi
   const [results, setResults] = useState<SearchResult>({});
   const [isLoading, setIsLoading] = useState(false);
   const [showResults, setShowResults] = useState(false);
+  const [searchError, setSearchError] = useState(false);
 
   const searchSubdivisions = useCallback(async (searchTerm: string) => {
     if (!searchTerm.trim() || searchTerm.length < 2) {
       setResults({});
+      setSearchError(false);
       return;
     }
 
     setIsLoading(true);
+    setSearchError(false);
     try {
       // Check if the search term looks like a subdivision code (e.g., KE-01, US-CA, KE-)
       const subdivisionCodePattern = /^[A-Z]{2}(-[A-Z0-9]*)?$/i;
@@ -202,6 +205,7 @@ const SearchComponent: React.FC<SearchComponentProps> = ({ onResultSelect, subdi
     } catch (error) {
       console.error('Search error:', error);
       setResults({});
+      setSearchError(true);
     } finally {
       setIsLoading(false);
     }
@@ -225,6 +229,7 @@ const SearchComponent: React.FC<SearchComponentProps> = ({ onResultSelect, subdi
     setQuery('');
     setResults({});
     setShowResults(false);
+    setSearchError(false);
   };
 
   const handleResultClick = (countryCode: string, subdivisionName: string, subdivisionCode: string) => {
@@ -269,8 +274,15 @@ const SearchComponent: React.FC<SearchComponentProps> = ({ onResultSelect, subdi
 
   const displayResults = formatResultsForDisplay();
 
-  // Calculate left position based on subdivision dropdown visibility
-  const leftPosition = subdivisionDropdownVisible ? 660 : 370;
+  // Layout constants — must match the positioned overlay controls in InteractiveMap.
+  const COUNTRY_DROPDOWN_LEFT_PX = 80;
+  const DROPDOWN_WIDTH_PX = 280;
+  const DROPDOWN_GAP_PX = 8;
+  // When subdivision dropdown is visible, search appears after both dropdowns.
+  // When not visible, it appears after the country dropdown only.
+  const SEARCH_LEFT_WITH_SUBDIVISION = COUNTRY_DROPDOWN_LEFT_PX + DROPDOWN_WIDTH_PX + DROPDOWN_GAP_PX + DROPDOWN_WIDTH_PX + DROPDOWN_GAP_PX; // 656
+  const SEARCH_LEFT_WITHOUT_SUBDIVISION = COUNTRY_DROPDOWN_LEFT_PX + DROPDOWN_WIDTH_PX + DROPDOWN_GAP_PX; // 368
+  const leftPosition = subdivisionDropdownVisible ? SEARCH_LEFT_WITH_SUBDIVISION : SEARCH_LEFT_WITHOUT_SUBDIVISION;
 
   return (
     <SearchContainer $leftPosition={leftPosition}>
@@ -315,6 +327,10 @@ const SearchComponent: React.FC<SearchComponentProps> = ({ onResultSelect, subdi
                 </ResultSubtitle>
               </SearchResultItem>
             ))
+          ) : searchError ? (
+            <NoResults style={{ color: '#dc3545' }}>
+              Search failed. Please check your connection and try again.
+            </NoResults>
           ) : !isLoading ? (
             <NoResults>
               {query.length < 2 

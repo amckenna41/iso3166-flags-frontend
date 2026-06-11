@@ -88,28 +88,28 @@ describe('iso3166Service', () => {
   });
 
   describe('getCountryInfo', () => {
-    const mockCountryInfo = {
-      name: { common: 'United States', official: 'United States of America' },
-      cca2: 'US',
-      cca3: 'USA',
-      ccn3: '840',
+    // v5 API format expected by the service's /api/country-info proxy
+    const mockV5CountryInfo = {
+      names: { common: 'United States', official: 'United States of America' },
+      codes: { alpha_2: 'US', alpha_3: 'USA', ccn3: '840' },
       region: 'Americas',
       subregion: 'Northern America',
-      capital: ['Washington, D.C.'],
-      area: 9372610,
+      capitals: [{ name: 'Washington, D.C.' }],
+      area: { kilometers: 9372610 },
       population: 329484123,
       timezones: ['UTC-12:00'],
-      currencies: { USD: { name: 'United States dollar', symbol: '$' } },
-      languages: { eng: 'English' },
-      flags: { svg: 'https://example.com/us.svg', png: 'https://example.com/us.png' },
+      currencies: [{ code: 'USD', name: 'United States dollar', symbol: '$' }],
+      languages: [{ iso639_1: 'en', name: 'English' }],
+      flag: { url_svg: 'https://example.com/us.svg', url_png: 'https://example.com/us.png' },
     };
 
+    const v5Response = { data: { data: { objects: [mockV5CountryInfo] } } };
+
     it('should return country data matching the RestCountryData shape', async () => {
-      mockedAxios.get.mockResolvedValueOnce({ data: [mockCountryInfo] });
+      mockedAxios.get.mockResolvedValueOnce(v5Response);
 
       const result = await iso3166Service.getCountryInfo('US');
       expect(result).toBeDefined();
-      // Validate top-level properties of the RestCountryData interface
       expect(result).toHaveProperty('cca2', 'US');
       expect(result).toHaveProperty('cca3', 'USA');
       expect(result).toHaveProperty('region', 'Americas');
@@ -117,7 +117,7 @@ describe('iso3166Service', () => {
     });
 
     it('should expose name.common and name.official', async () => {
-      mockedAxios.get.mockResolvedValueOnce({ data: [mockCountryInfo] });
+      mockedAxios.get.mockResolvedValueOnce(v5Response);
 
       const result = await iso3166Service.getCountryInfo('US');
       expect(result?.name.common).toBe('United States');
@@ -125,15 +125,15 @@ describe('iso3166Service', () => {
     });
 
     it('should expose capital as an array', async () => {
-      mockedAxios.get.mockResolvedValueOnce({ data: [mockCountryInfo] });
+      mockedAxios.get.mockResolvedValueOnce(v5Response);
 
       const result = await iso3166Service.getCountryInfo('US');
       expect(Array.isArray(result?.capital)).toBe(true);
       expect(result?.capital[0]).toBe('Washington, D.C.');
     });
 
-    it('should return null when the API returns an empty array', async () => {
-      mockedAxios.get.mockResolvedValueOnce({ data: [] });
+    it('should return null when the API returns no objects', async () => {
+      mockedAxios.get.mockResolvedValueOnce({ data: { data: { objects: [] } } });
 
       const result = await iso3166Service.getCountryInfo('XX');
       expect(result).toBeNull();
@@ -147,7 +147,7 @@ describe('iso3166Service', () => {
     });
 
     it('should cache results and avoid duplicate API calls', async () => {
-      mockedAxios.get.mockResolvedValueOnce({ data: [mockCountryInfo] });
+      mockedAxios.get.mockResolvedValueOnce(v5Response);
 
       await iso3166Service.getCountryInfo('US');
       await iso3166Service.getCountryInfo('US');
@@ -171,11 +171,10 @@ describe('iso3166Service', () => {
       );
     });
 
-    it('should return empty object on API failure', async () => {
+    it('should re-throw on API failure', async () => {
       mockedAxios.get.mockRejectedValueOnce(new Error('Network error'));
 
-      const result = await iso3166Service.searchSubdivisions('test');
-      expect(result).toEqual({});
+      await expect(iso3166Service.searchSubdivisions('test')).rejects.toThrow('Network error');
     });
   });
 });

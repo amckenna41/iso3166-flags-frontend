@@ -1,10 +1,11 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
-import styled from 'styled-components';
-import { X, MapPin, Flag, Globe, Users, Calendar, ExternalLink, Code, Building2, Compass, Ruler, ChevronLeft, ChevronRight } from 'lucide-react';
-import { CountryData, RestCountryData, iso3166Service } from '../services/iso3166Service';
+import styled, { keyframes } from 'styled-components';
+import { X, MapPin, Flag, Globe, Users, Calendar, ExternalLink, Code, Building2, Compass, Ruler, Clock, DollarSign, Languages, Copy, Check, ArrowUpDown, Globe2, Star } from 'lucide-react';
+import { CountryData, RestCountryData, SubdivisionData, iso3166Service } from '../services/iso3166Service';
 import APP_CONFIG from '../config/appConfig';
 import DemoInfo from './DemoInfo';
 import ExportButton from './ExportButton';
+import SubdivisionModal from './SubdivisionModal';
 
 const InfoContainer = styled.div`
   height: 100%;
@@ -13,18 +14,9 @@ const InfoContainer = styled.div`
 `;
 
 const Header = styled.div`
-  padding: 20px;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   position: relative;
-  
-  @media (max-width: 768px) {
-    padding: 16px;
-  }
-  
-  @media (max-width: 480px) {
-    padding: 12px;
-  }
 `;
 
 const CloseButton = styled.button`
@@ -58,19 +50,65 @@ const ExportButtonContainer = styled.div`
   }
 `;
 
+export const FAVOURITES_KEY = 'iso3166_favourite_countries';
+
+const TitleRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 80px 6px 0;
+
+  @media (max-width: 768px) {
+    margin-right: 70px;
+  }
+
+  @media (max-width: 480px) {
+    margin-right: 60px;
+  }
+`;
+
 const CountryTitle = styled.h2`
-  margin: 0 40px 10px 0;
+  margin: 0;
   font-size: 24px;
   font-weight: 600;
-  
+
   @media (max-width: 768px) {
     font-size: 20px;
-    margin-right: 32px;
   }
-  
+
   @media (max-width: 480px) {
     font-size: 18px;
-    margin-right: 28px;
+  }
+`;
+
+const OfficialName = styled.p`
+  margin: 0 80px 8px 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  font-style: italic;
+  line-height: 1.3;
+
+  @media (max-width: 480px) {
+    font-size: 11px;
+    margin-right: 60px;
+  }
+`;
+
+const FavStarButton = styled.button<{ $active: boolean }>`
+  background: none;
+  border: none;
+  color: ${props => props.$active ? '#fbbf24' : 'rgba(255, 255, 255, 0.45)'};
+  cursor: pointer;
+  padding: 3px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+
+  &:hover {
+    color: #fbbf24;
+    background: rgba(255, 255, 255, 0.12);
   }
 `;
 
@@ -147,6 +185,24 @@ const CountryDetailItem = styled.div`
     .value {
       font-size: 12px;
     }
+  }
+`;
+
+const MoreButton = styled.button`
+  grid-column: 1 / -1;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 10px;
+  cursor: pointer;
+  width: fit-content;
+  transition: background 0.2s;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.25);
   }
 `;
 
@@ -488,6 +544,246 @@ const LoadingMessage = styled.div`
   color: #666;
 `;
 
+// ── Filter / sort bar ─────────────────────────────────────────────────────────
+
+const FilterBar = styled.div`
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 12px 20px 0;
+  flex-wrap: wrap;
+
+  @media (max-width: 480px) {
+    padding: 8px 12px 0;
+    gap: 6px;
+  }
+`;
+
+const FilterInput = styled.input`
+  flex: 1;
+  min-width: 120px;
+  padding: 7px 10px;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  font-size: 13px;
+  outline: none;
+  background: #fff;
+
+  &:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.15);
+  }
+
+  &::placeholder {
+    color: #adb5bd;
+  }
+`;
+
+const TypeSelect = styled.select`
+  padding: 7px 8px;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  font-size: 12px;
+  outline: none;
+  background: #fff;
+  cursor: pointer;
+  color: #495057;
+  max-width: 130px;
+
+  &:focus {
+    border-color: #667eea;
+  }
+`;
+
+const SortButton = styled.button`
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 7px 10px;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  font-size: 12px;
+  background: #fff;
+  color: #495057;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+
+  &:hover {
+    border-color: #667eea;
+    color: #667eea;
+  }
+`;
+
+const FilterResultsRow = styled.div`
+  padding: 6px 20px 0;
+  font-size: 12px;
+  color: #6c757d;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  @media (max-width: 480px) {
+    padding: 4px 12px 0;
+  }
+`;
+
+const ClearFilterLink = styled.button`
+  background: none;
+  border: none;
+  color: #667eea;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+`;
+
+// ── Skeleton loader ───────────────────────────────────────────────────────────
+
+const shimmer = keyframes`
+  0% { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+`;
+
+const SkeletonCard = styled.div`
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  padding: 16px;
+  background: white;
+
+  .skel-header {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .skel-flag {
+    width: 50px;
+    height: 38px;
+    border-radius: 4px;
+    flex-shrink: 0;
+    background: linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%);
+    background-size: 800px 100%;
+    animation: ${shimmer} 1.5s infinite;
+  }
+  .skel-lines {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    justify-content: center;
+  }
+  .skel-line {
+    height: 12px;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%);
+    background-size: 800px 100%;
+    animation: ${shimmer} 1.5s infinite;
+  }
+  .skel-line.short { width: 40%; }
+  .skel-line.medium { width: 60%; }
+  .skel-line.full { width: 90%; }
+`;
+
+// ── Flag placeholder ──────────────────────────────────────────────────────────
+
+const FlagPlaceholder = styled.div`
+  width: 50px;
+  height: 38px;
+  border: 1px dashed #dee2e6;
+  border-radius: 4px;
+  flex-shrink: 0;
+  background: #f8f9fa;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: #adb5bd;
+`;
+
+const ModalFlagPlaceholder = styled.div`
+  width: 120px;
+  height: 90px;
+  border: 2px dashed rgba(255, 255, 255, 0.4);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36px;
+  opacity: 0.7;
+`;
+
+// ── Copy code button ──────────────────────────────────────────────────────────
+
+const CopyCodeWrapper = styled.span`
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+`;
+
+const CopyButton = styled.button`
+  background: none;
+  border: none;
+  padding: 2px 4px;
+  cursor: pointer;
+  color: #adb5bd;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 3px;
+  transition: all 0.15s;
+  line-height: 1;
+
+  &:hover {
+    color: #667eea;
+    background: rgba(102, 126, 234, 0.1);
+  }
+`;
+
+// ── Virtual scroll sentinel ───────────────────────────────────────────────────
+
+const LoadMoreSentinel = styled.div`
+  height: 1px;
+`;
+
+const LoadMoreHint = styled.div`
+  text-align: center;
+  padding: 12px;
+  font-size: 12px;
+  color: #adb5bd;
+`;
+
+// ── Collapsible header body ───────────────────────────────────────────────────
+
+const CollapsibleHeaderBody = styled.div`
+  overflow: hidden;
+`;
+
+const CollapsibleHeaderBodyInner = styled.div``;
+
+const InlineFlagSmall = styled.img`
+  height: auto;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 3px;
+  flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+`;
+
+const spin = keyframes`
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+`;
+
+const SpinningLoaderInline = styled.span`
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: ${spin} 0.8s linear infinite;
+  vertical-align: middle;
+  margin-right: 8px;
+`;
+
 // Modal Components
 const ModalOverlay = styled.div`
   position: fixed;
@@ -724,24 +1020,89 @@ interface CountryInfoProps {
   onClose: () => void;
 }
 
+const SORT_ORDERS = ['code-asc', 'name-asc', 'name-desc'] as const;
+type SortOrder = typeof SORT_ORDERS[number];
+const SORT_LABELS: Record<SortOrder, string> = {
+  'code-asc': 'Code A→Z',
+  'name-asc': 'Name A→Z',
+  'name-desc': 'Name Z→A',
+};
+
+const VIRTUAL_PAGE = 30;
+
 const CountryInfo: React.FC<CountryInfoProps> = ({ countryName, countryData, countryCode, highlightedSubdivision, onClose }) => {
   const [showRawData, setShowRawData] = useState<{ [key: string]: boolean }>({});
   const [countryInfo, setCountryInfo] = useState<RestCountryData | null>(null);
   const [loadingInfo, setLoadingInfo] = useState(false);
-  const [selectedSubdivisionModal, setSelectedSubdivisionModal] = useState<any>(null);
+  const [showMoreDetails, setShowMoreDetails] = useState(false);
+  const [selectedSubdivisionModal, setSelectedSubdivisionModal] = useState<SubdivisionData | null>(null);
   const [currentSubdivisionIndex, setCurrentSubdivisionIndex] = useState<number>(0);
-  
+
+  // Filter / sort state
+  const [filterText, setFilterText] = useState('');
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('code-asc');
+
+  // Virtual scroll
+  const [visibleCount, setVisibleCount] = useState(VIRTUAL_PAGE);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  // Flag error tracking (show placeholder instead of broken img)
+  const [flagErrors, setFlagErrors] = useState<Set<string>>(new Set());
+
+  // Copy-to-clipboard feedback
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
+
+  // Favourite / bookmark state
+  const [isFavourite, setIsFavourite] = useState(false);
+
+  // Scroll-driven header collapse
+  const [scrollTop, setScrollTop] = useState(0);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const collapseInnerRef = useRef<HTMLDivElement>(null);
+  const naturalHeightRef = useRef(0);
+
   // Ref to track subdivision elements for scrolling
   const subdivisionRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
   const subdivisions = useMemo(() => {
     if (!countryData) return [];
-    
+
     return Object.entries(countryData).map(([subdivisionCode, data]) => ({
       ...data,
       code: data.code || subdivisionCode
     })).sort((a, b) => a.code.localeCompare(b.code));
   }, [countryData]);
+
+  const availableTypes = useMemo(() => {
+    const types = new Set(subdivisions.map(s => s.type).filter(Boolean));
+    return Array.from(types).sort();
+  }, [subdivisions]);
+
+  const filteredSubdivisions = useMemo(() => {
+    let result = subdivisions;
+    if (filterText.trim()) {
+      const term = filterText.toLowerCase();
+      result = result.filter(
+        s => s.name.toLowerCase().includes(term) || s.code.toLowerCase().includes(term)
+      );
+    }
+    if (typeFilter !== 'all') {
+      result = result.filter(s => s.type === typeFilter);
+    }
+    switch (sortOrder) {
+      case 'name-asc': return [...result].sort((a, b) => a.name.localeCompare(b.name));
+      case 'name-desc': return [...result].sort((a, b) => b.name.localeCompare(a.name));
+      case 'code-asc': default: return result;
+    }
+  }, [subdivisions, filterText, typeFilter, sortOrder]);
+
+  const visibleSubdivisions = useMemo(
+    () => filteredSubdivisions.slice(0, visibleCount),
+    [filteredSubdivisions, visibleCount]
+  );
+
+  const isFiltered = filterText.trim() !== '' || typeFilter !== 'all';
 
   const toggleRawData = (subdivisionCode: string) => {
     setShowRawData(prev => ({
@@ -750,7 +1111,7 @@ const CountryInfo: React.FC<CountryInfoProps> = ({ countryName, countryData, cou
     }));
   };
 
-  const handleSubdivisionClick = (subdivision: any) => {
+  const handleSubdivisionClick = (subdivision: SubdivisionData) => {
     const index = subdivisions.findIndex(sub => sub.code === subdivision.code);
     setCurrentSubdivisionIndex(index);
     setSelectedSubdivisionModal(subdivision);
@@ -777,12 +1138,54 @@ const CountryInfo: React.FC<CountryInfoProps> = ({ countryName, countryData, cou
     }
   }, [currentSubdivisionIndex, subdivisions]);
 
+  const copyCode = useCallback((code: string) => {
+    navigator.clipboard.writeText(code).then(() => {
+      setCopiedCode(code);
+      setTimeout(() => setCopiedCode(null), 1500);
+    }).catch(() => {});
+  }, []);
+
+  // Sync isFavourite whenever the selected country changes
+  useEffect(() => {
+    const code = countryCode?.toUpperCase() ?? '';
+    if (!code) { setIsFavourite(false); return; }
+    try {
+      const stored = localStorage.getItem(FAVOURITES_KEY);
+      const favs: { code: string; name: string }[] = stored ? JSON.parse(stored) : [];
+      setIsFavourite(favs.some(f => f.code.toUpperCase() === code));
+    } catch {
+      setIsFavourite(false);
+    }
+  }, [countryCode]);
+
+  const toggleFavourite = useCallback(() => {
+    const code = countryCode?.toUpperCase() ?? '';
+    if (!code || !countryName) return;
+    try {
+      const stored = localStorage.getItem(FAVOURITES_KEY);
+      let favs: { code: string; name: string }[] = stored ? JSON.parse(stored) : [];
+      if (isFavourite) {
+        favs = favs.filter(f => f.code.toUpperCase() !== code);
+      } else {
+        favs = [{ code, name: countryName }, ...favs];
+      }
+      localStorage.setItem(FAVOURITES_KEY, JSON.stringify(favs));
+      setIsFavourite(v => !v);
+      window.dispatchEvent(new CustomEvent('iso3166:favourites-changed'));
+    } catch {}
+  }, [countryCode, countryName, isFavourite]);
+
+  const handleContentScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    setScrollTop(e.currentTarget.scrollTop);
+  }, []);
+
   // Fetch country information from RestCountries API
   useEffect(() => {
     const fetchCountryInfo = async () => {
       // Clear previous country info when switching countries
       setCountryInfo(null);
       setLoadingInfo(false);
+      setShowMoreDetails(false);
       
       // Determine the country code from subdivisions or the explicit prop
       let targetCountryCode: string | null = null;
@@ -827,27 +1230,57 @@ const CountryInfo: React.FC<CountryInfoProps> = ({ countryName, countryData, cou
     }
   }, [highlightedSubdivision, countryData]); // Also depend on countryData to ensure data is loaded
 
-  // Handle keyboard navigation for subdivision modal
+  // Reset visible count and clear filter errors when country changes
   useEffect(() => {
-    if (!selectedSubdivisionModal) {
-      return; // Only listen for keyboard when modal is open
+    setVisibleCount(VIRTUAL_PAGE);
+    setFilterText('');
+    setTypeFilter('all');
+    setSortOrder('code-asc');
+    setFlagErrors(new Set());
+    setScrollTop(0);
+    naturalHeightRef.current = 0;
+    if (contentRef.current) contentRef.current.scrollTop = 0;
+  }, [countryData]);
+
+  // Reset visible count when filters change
+  useEffect(() => {
+    setVisibleCount(VIRTUAL_PAGE);
+  }, [filterText, typeFilter, sortOrder]);
+
+  // Ensure highlighted subdivision is within visible window
+  useEffect(() => {
+    if (!highlightedSubdivision) return;
+    const idx = filteredSubdivisions.findIndex(s => s.code === highlightedSubdivision);
+    if (idx >= 0) {
+      setVisibleCount(prev => Math.max(prev, idx + 1));
     }
+  }, [highlightedSubdivision, filteredSubdivisions]);
 
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'ArrowLeft') {
-        event.preventDefault();
-        navigateToPrevious();
-      } else if (event.key === 'ArrowRight') {
-        event.preventDefault();
-        navigateToNext();
-      }
-    };
+  // Intersection observer — load more subdivisions as user scrolls
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries[0].isIntersecting && visibleCount < filteredSubdivisions.length) {
+          setVisibleCount(prev => prev + VIRTUAL_PAGE);
+        }
+      },
+      { threshold: 0.1 }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [filteredSubdivisions.length, visibleCount]);
 
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [selectedSubdivisionModal, navigateToNext, navigateToPrevious]);
+  // Measure the natural (fully expanded) height of the collapsible header body
+  // whenever its content changes. offsetHeight of the inner div is always the
+  // natural content height regardless of the outer wrapper's overflow clipping.
+  useEffect(() => {
+    if (collapseInnerRef.current) {
+      const h = collapseInnerRef.current.offsetHeight;
+      if (h > 0) naturalHeightRef.current = h;
+    }
+  }, [countryInfo, loadingInfo, showMoreDetails]);
 
   const stats = useMemo(() => {
     if (!subdivisions.length) return null;
@@ -877,6 +1310,24 @@ const CountryInfo: React.FC<CountryInfoProps> = ({ countryName, countryData, cou
     return subdivisions[0].code.split('-')[0];
   };
 
+  // ── Scroll-driven collapse values ──────────────────────────────────────────
+  // Collapse completes over the first 140px of scroll. Ease-out so the initial
+  // scroll feels immediate while the final collapse slows down.
+  const COLLAPSE_RANGE = 140;
+  const rawProgress = Math.min(scrollTop / COLLAPSE_RANGE, 1);
+  const collapseProgress = rawProgress < 1 ? 1 - Math.pow(1 - rawProgress, 2) : 1;
+
+  // Header vertical padding: 20px → 8px
+  const headerPaddingV = Math.round(20 - 12 * collapseProgress);
+  // Collapsible body: shrink from naturalHeight → 0
+  const collapsibleHeight = naturalHeightRef.current > 0
+    ? Math.round(naturalHeightRef.current * (1 - collapseProgress))
+    : undefined;
+  // Body content fades out faster than it shrinks
+  const bodyOpacity = Math.max(0, 1 - collapseProgress * 1.6);
+  // Inline flag fades in after the first 35% of scroll
+  const inlineFlagOpacity = Math.max(0, (collapseProgress - 0.35) / 0.65);
+
   if (!countryName) {
     return (
       <InfoContainer>
@@ -887,98 +1338,201 @@ const CountryInfo: React.FC<CountryInfoProps> = ({ countryName, countryData, cou
 
   return (
     <InfoContainer>
-      <Header>
+      <Header style={{ padding: `${headerPaddingV}px 20px` }}>
         <CloseButton onClick={onClose}>
           <X size={18} />
         </CloseButton>
         <ExportButtonContainer>
           {APP_CONFIG.features.enableExport && (
-            <ExportButton 
-              country={countryInfo} 
-              subdivisions={subdivisions} 
-              countryName={countryName || undefined} 
+            <ExportButton
+              country={countryInfo}
+              subdivisions={subdivisions}
+              countryName={countryName || undefined}
             />
           )}
         </ExportButtonContainer>
-        <CountryTitle>{countryName}</CountryTitle>
-        {getCountryCode() && (
-          <CountryFlag
-            src={iso3166Service.getCountryFlagUrl(getCountryCode())}
-            alt={`${countryName} flag`}
-            onError={(e) => {
-              (e.target as HTMLImageElement).style.display = 'none';
-            }}
-          />
-        )}
+        <TitleRow>
+          {getCountryCode() && (
+            <InlineFlagSmall
+              src={iso3166Service.getCountryFlagUrl(getCountryCode())}
+              alt={`${countryName} flag`}
+              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              style={{
+                width: `${Math.round(26 * inlineFlagOpacity)}px`,
+                opacity: inlineFlagOpacity,
+                marginRight: inlineFlagOpacity > 0.01 ? undefined : '-8px',
+              }}
+            />
+          )}
+          <CountryTitle>{countryName}</CountryTitle>
+          {countryCode && (
+            <FavStarButton
+              $active={isFavourite}
+              onClick={toggleFavourite}
+              title={isFavourite ? 'Remove from favourites' : 'Add to favourites'}
+            >
+              <Star size={16} fill={isFavourite ? 'currentColor' : 'none'} />
+            </FavStarButton>
+          )}
+        </TitleRow>
 
-        {countryInfo && !loadingInfo && (
-          <CountryDetails>
-            <CountryDetailItem>
-              <Building2 className="icon" size={14} />
-              <span className="label">Capital:</span>
-              <span className="value">{countryInfo.capital?.[0] || 'N/A'}</span>
-            </CountryDetailItem>
-            
-            <CountryDetailItem>
-              <Globe className="icon" size={14} />
-              <span className="label">Region:</span>
-              <span className="value">{countryInfo.region}</span>
-            </CountryDetailItem>
+        <CollapsibleHeaderBody
+          style={collapsibleHeight !== undefined ? { height: `${collapsibleHeight}px` } : undefined}
+        >
+          <CollapsibleHeaderBodyInner
+            ref={collapseInnerRef}
+            style={{ opacity: bodyOpacity }}
+          >
+            {countryInfo && !loadingInfo &&
+              countryInfo.name.official &&
+              countryInfo.name.official !== countryInfo.name.common && (
+                <OfficialName title={countryInfo.name.official}>
+                  {countryInfo.name.official}
+                </OfficialName>
+              )}
 
-            {countryInfo.subregion && (
-              <CountryDetailItem>
-                <Compass className="icon" size={14} />
-                <span className="label">Subregion:</span>
-                <span className="value">{countryInfo.subregion}</span>
-              </CountryDetailItem>
+            {getCountryCode() && (
+              <CountryFlag
+                src={iso3166Service.getCountryFlagUrl(getCountryCode())}
+                alt={`${countryName} flag`}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
+              />
             )}
 
-            <CountryDetailItem>
-              <Users className="icon" size={14} />
-              <span className="label">Population:</span>
-              <span className="value">{countryInfo.population.toLocaleString()}</span>
-            </CountryDetailItem>
+            {countryInfo && !loadingInfo && (
+              <CountryDetails>
+                <CountryDetailItem>
+                  <Building2 className="icon" size={14} />
+                  <span className="label">Capital:</span>
+                  <span className="value">{countryInfo.capital?.[0] || 'N/A'}</span>
+                </CountryDetailItem>
 
-            <CountryDetailItem>
-              <Ruler className="icon" size={14} />
-              <span className="label">Area:</span>
-              <span className="value">{countryInfo.area.toLocaleString()} km²</span>
-            </CountryDetailItem>
+                <CountryDetailItem>
+                  <Globe className="icon" size={14} />
+                  <span className="label">Region:</span>
+                  <span className="value">{countryInfo.region}</span>
+                </CountryDetailItem>
 
-            <CodesContainer>
-              <div>
-                <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.7)', marginBottom: '4px' }}>ISO Codes:</div>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <CodeBadge>Alpha-2: {countryInfo.cca2}</CodeBadge>
-                  <CodeBadge>Alpha-3: {countryInfo.cca3}</CodeBadge>
-                  <CodeBadge>Numeric: {countryInfo.ccn3}</CodeBadge>
-                </div>
+                {countryInfo.subregion && (
+                  <CountryDetailItem>
+                    <Compass className="icon" size={14} />
+                    <span className="label">Subregion:</span>
+                    <span className="value">{countryInfo.subregion}</span>
+                  </CountryDetailItem>
+                )}
+
+                <CountryDetailItem>
+                  <Users className="icon" size={14} />
+                  <span className="label">Population:</span>
+                  <span className="value">{countryInfo.population?.toLocaleString() ?? 'N/A'}</span>
+                </CountryDetailItem>
+
+                <CountryDetailItem>
+                  <Ruler className="icon" size={14} />
+                  <span className="label">Area:</span>
+                  <span className="value">{countryInfo.area?.toLocaleString() ?? 'N/A'} km²</span>
+                </CountryDetailItem>
+
+                <MoreButton onClick={() => setShowMoreDetails(v => !v)}>
+                  {showMoreDetails ? '− Less' : '+ More'}
+                </MoreButton>
+
+                {showMoreDetails && (
+                  <>
+                    {countryInfo.currencies && Object.keys(countryInfo.currencies).length > 0 && (
+                      <CountryDetailItem>
+                        <DollarSign className="icon" size={14} />
+                        <span className="label">Currency:</span>
+                        <span className="value">
+                          {Object.entries(countryInfo.currencies)
+                            .map(([code, c]) => `${c.name}${c.symbol ? ` (${code}, ${c.symbol})` : ` (${code})`}`)
+                            .join(', ')}
+                        </span>
+                      </CountryDetailItem>
+                    )}
+
+                    {countryInfo.languages && Object.keys(countryInfo.languages).length > 0 && (
+                      <CountryDetailItem>
+                        <Languages className="icon" size={14} />
+                        <span className="label">Languages:</span>
+                        <span className="value">{Object.values(countryInfo.languages).join(', ')}</span>
+                      </CountryDetailItem>
+                    )}
+
+                    {countryInfo.timezones && countryInfo.timezones.length > 0 && (
+                      <CountryDetailItem style={{ gridColumn: '1 / -1' }}>
+                        <Clock className="icon" size={14} />
+                        <span className="label">Timezones:</span>
+                        <span className="value">{countryInfo.timezones.join(', ')}</span>
+                      </CountryDetailItem>
+                    )}
+
+                    {countryInfo.tlds && countryInfo.tlds.length > 0 && (
+                      <CountryDetailItem>
+                        <Globe2 className="icon" size={14} />
+                        <span className="label">TLD:</span>
+                        <span className="value">{countryInfo.tlds.join(', ')}</span>
+                      </CountryDetailItem>
+                    )}
+
+                    {countryInfo.memberships && countryInfo.memberships.length > 0 && (
+                      <CountryDetailItem style={{ gridColumn: '1 / -1' }}>
+                        <Users className="icon" size={14} />
+                        <span className="label">Memberships:</span>
+                        <span className="value">{countryInfo.memberships.join(', ')}</span>
+                      </CountryDetailItem>
+                    )}
+                  </>
+                )}
+
+                <CodesContainer>
+                  <div>
+                    <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.7)', marginBottom: '4px' }}>ISO Codes:</div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <CodeBadge>Alpha-2: {countryInfo.cca2}</CodeBadge>
+                      <CodeBadge>Alpha-3: {countryInfo.cca3}</CodeBadge>
+                      <CodeBadge>Numeric: {countryInfo.ccn3}</CodeBadge>
+                    </div>
+                  </div>
+                </CodesContainer>
+              </CountryDetails>
+            )}
+
+            {loadingInfo && (
+              <div style={{ marginTop: '15px', color: 'rgba(255,255,255,0.8)', fontSize: '14px', display: 'flex', alignItems: 'center' }}>
+                <SpinningLoaderInline />
+                Loading country information...
               </div>
-            </CodesContainer>
-          </CountryDetails>
-        )}
+            )}
 
-        {loadingInfo && (
-          <div style={{ marginTop: '15px', color: 'rgba(255,255,255,0.8)', fontSize: '14px' }}>
-            🏛️ Loading country information...
-          </div>
-        )}
-
-        {!loadingInfo && !countryInfo && subdivisions.length > 0 && (
-          <div style={{ marginTop: '15px', color: 'rgba(255,255,255,0.6)', fontSize: '12px' }}>
-            ⚠️ Country info not available
-          </div>
-        )}
+            {!loadingInfo && !countryInfo && subdivisions.length > 0 && (
+              <div style={{ marginTop: '15px', color: 'rgba(255,255,255,0.6)', fontSize: '12px' }}>
+                ⚠️ Country info not available
+              </div>
+            )}
+          </CollapsibleHeaderBodyInner>
+        </CollapsibleHeaderBody>
       </Header>
 
-      <Content>
+      <Content ref={contentRef} onScroll={handleContentScroll}>
         {!countryData ? (
-          <LoadingMessage>
-            <div>⏳ Loading subdivision data...</div>
-            <div style={{fontSize: '12px', color: '#999', marginTop: '8px'}}>
-              Requesting data for country: {countryCode}
-            </div>
-          </LoadingMessage>
+          <SubdivisionsContainer>
+            {[...Array(6)].map((_, i) => (
+              <SkeletonCard key={i}>
+                <div className="skel-header">
+                  <div className="skel-flag" />
+                  <div className="skel-lines">
+                    <div className="skel-line medium" />
+                    <div className="skel-line short" />
+                  </div>
+                </div>
+                <div className="skel-line full" style={{ marginBottom: 6 }} />
+                <div className="skel-line medium" />
+              </SkeletonCard>
+            ))}
+          </SubdivisionsContainer>
         ) : Object.keys(countryData).length === 0 ? (
           <LoadingMessage>
             {getCountryCode() && (
@@ -1026,31 +1580,91 @@ const CountryInfo: React.FC<CountryInfoProps> = ({ countryName, countryData, cou
               </StatsContainer>
             )}
 
+            {/* Filter / sort controls */}
+            <FilterBar>
+              <FilterInput
+                type="text"
+                placeholder="Search by name or code…"
+                value={filterText}
+                onChange={e => setFilterText(e.target.value)}
+              />
+              {availableTypes.length > 1 && (
+                <TypeSelect
+                  value={typeFilter}
+                  onChange={e => setTypeFilter(e.target.value)}
+                  title="Filter by subdivision type"
+                >
+                  <option value="all">All types</option>
+                  {availableTypes.map(t => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </TypeSelect>
+              )}
+              <SortButton
+                onClick={() => {
+                  const idx = SORT_ORDERS.indexOf(sortOrder);
+                  setSortOrder(SORT_ORDERS[(idx + 1) % SORT_ORDERS.length]);
+                }}
+                title="Change sort order"
+              >
+                <ArrowUpDown size={13} />
+                {SORT_LABELS[sortOrder]}
+              </SortButton>
+            </FilterBar>
+
+            {isFiltered && (
+              <FilterResultsRow>
+                {filteredSubdivisions.length} of {subdivisions.length} results
+                <ClearFilterLink onClick={() => { setFilterText(''); setTypeFilter('all'); }}>
+                  Clear filters
+                </ClearFilterLink>
+              </FilterResultsRow>
+            )}
+
             <SubdivisionsContainer>
               <SectionTitle>
                 <Flag size={20} />
                 Subdivisions & Flags
               </SectionTitle>
 
+              {filteredSubdivisions.length === 0 ? (
+                <LoadingMessage style={{ padding: '24px 0' }}>
+                  No subdivisions match the current filters.
+                </LoadingMessage>
+              ) : null}
+
               <SubdivisionsList>
-                {subdivisions.map((subdivision) => (
-                  <SubdivisionCard 
+                {visibleSubdivisions.map((subdivision) => (
+                  <SubdivisionCard
                     key={subdivision.code}
                     ref={(el) => { subdivisionRefs.current[subdivision.code] = el; }}
                     $highlighted={highlightedSubdivision === subdivision.code}
                     onClick={() => handleSubdivisionClick(subdivision)}
                   >
                     <SubdivisionHeader>
-                      <SubdivisionFlag
-                        src={subdivision.flag || iso3166Service.getSubdivisionFlagUrl(getCountryCode(), subdivision.code)}
-                        alt={`${subdivision.name} flag`}
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).style.display = 'none';
-                        }}
-                      />
+                      {flagErrors.has(subdivision.code) ? (
+                        <FlagPlaceholder title="Flag not available">🏳</FlagPlaceholder>
+                      ) : (
+                        <SubdivisionFlag
+                          src={subdivision.flag || iso3166Service.getSubdivisionFlagUrl(getCountryCode(), subdivision.code)}
+                          alt={`${subdivision.name} flag`}
+                          loading="lazy"
+                          onError={() => setFlagErrors(prev => { const next = new Set(prev); next.add(subdivision.code); return next; })}
+                        />
+                      )}
                       <SubdivisionInfo>
                         <SubdivisionName>{subdivision.name}</SubdivisionName>
-                        <SubdivisionCode>{subdivision.code}</SubdivisionCode>
+                        <CopyCodeWrapper>
+                          <SubdivisionCode>{subdivision.code}</SubdivisionCode>
+                          <CopyButton
+                            onClick={e => { e.stopPropagation(); copyCode(subdivision.code); }}
+                            title="Copy code"
+                          >
+                            {copiedCode === subdivision.code
+                              ? <Check size={11} color="#22c55e" />
+                              : <Copy size={11} />}
+                          </CopyButton>
+                        </CopyCodeWrapper>
                       </SubdivisionInfo>
                     </SubdivisionHeader>
 
@@ -1125,7 +1739,7 @@ const CountryInfo: React.FC<CountryInfoProps> = ({ countryName, countryData, cou
                       )}
 
                       <RawDataSection>
-                        <RawDataToggle onClick={() => toggleRawData(subdivision.code)}>
+                        <RawDataToggle onClick={e => { e.stopPropagation(); toggleRawData(subdivision.code); }}>
                           <Code size={12} />
                           {showRawData[subdivision.code] ? 'Hide' : 'Show'} Raw JSON Data
                         </RawDataToggle>
@@ -1139,181 +1753,29 @@ const CountryInfo: React.FC<CountryInfoProps> = ({ countryName, countryData, cou
                   </SubdivisionCard>
                 ))}
               </SubdivisionsList>
+
+              {/* Intersection sentinel — triggers loading more items */}
+              <LoadMoreSentinel ref={sentinelRef} />
+              {visibleCount < filteredSubdivisions.length && (
+                <LoadMoreHint>
+                  Showing {visibleCount} of {filteredSubdivisions.length} — scroll to load more
+                </LoadMoreHint>
+              )}
             </SubdivisionsContainer>
           </>
         )}
       </Content>
 
-      {/* Subdivision Modal */}
       {selectedSubdivisionModal && (
-        <ModalOverlay onClick={closeModal}>
-          <ModalContent onClick={(e) => e.stopPropagation()}>
-            {/* Previous subdivision preview */}
-            {currentSubdivisionIndex > 0 && (
-              <ModalNavPreview $position="left" className="visible">
-                {subdivisions[currentSubdivisionIndex - 1].code}
-              </ModalNavPreview>
-            )}
-
-            {/* Next subdivision preview */}
-            {currentSubdivisionIndex < subdivisions.length - 1 && (
-              <ModalNavPreview $position="right" className="visible">
-                {subdivisions[currentSubdivisionIndex + 1].code}
-              </ModalNavPreview>
-            )}
-
-            <ModalNavButton 
-              $position="left" 
-              onClick={navigateToPrevious}
-              disabled={currentSubdivisionIndex === 0}
-            >
-              <ChevronLeft size={24} />
-            </ModalNavButton>
-            
-            <ModalNavButton 
-              $position="right" 
-              onClick={navigateToNext}
-              disabled={currentSubdivisionIndex === subdivisions.length - 1}
-            >
-              <ChevronRight size={24} />
-            </ModalNavButton>
-
-            <ModalHeader>
-              <ModalCloseButton onClick={closeModal}>
-                <X size={20} />
-              </ModalCloseButton>
-              <ModalTitle>
-                <span className="subdivision-name">{selectedSubdivisionModal.name}</span>
-                <span className="separator">:</span>
-                <span className="subdivision-code">{selectedSubdivisionModal.code}</span>
-              </ModalTitle>
-              <ModalSubtitle>
-                <ModalFlag
-                  src={selectedSubdivisionModal.flag || iso3166Service.getSubdivisionFlagUrl(getCountryCode(), selectedSubdivisionModal.code)}
-                  alt={`${selectedSubdivisionModal.name} flag`}
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none';
-                  }}
-                />
-              </ModalSubtitle>
-            </ModalHeader>
-
-            <ModalBody>
-              <ModalDetailGrid>
-                <ModalDetailItem>
-                  <MapPin className="icon" size={16} />
-                  <div className="content">
-                    <span className="label">Type</span>
-                    <span className="value">{selectedSubdivisionModal.type}</span>
-                  </div>
-                </ModalDetailItem>
-
-                <ModalDetailItem>
-                  <Globe className="icon" size={16} />
-                  <div className="content">
-                    <span className="label">Local/Other Name</span>
-                    <span className="value">
-                      {selectedSubdivisionModal.localOtherName || 'Not available'}
-                    </span>
-                  </div>
-                </ModalDetailItem>
-
-                <ModalDetailItem>
-                  <Compass className="icon" size={16} />
-                  <div className="content">
-                    <span className="label">Coordinates</span>
-                    <span className="value">
-                      {selectedSubdivisionModal.latLng && selectedSubdivisionModal.latLng.length === 2 ? (
-                        <span style={{ fontFamily: 'monospace', fontWeight: '500' }}>
-                          {Math.abs(selectedSubdivisionModal.latLng[0]).toFixed(6)}°{selectedSubdivisionModal.latLng[0] >= 0 ? 'N' : 'S'}, {Math.abs(selectedSubdivisionModal.latLng[1]).toFixed(6)}°{selectedSubdivisionModal.latLng[1] >= 0 ? 'E' : 'W'}
-                        </span>
-                      ) : (
-                        'Not available'
-                      )}
-                    </span>
-                  </div>
-                </ModalDetailItem>
-
-                <ModalDetailItem>
-                  <Users className="icon" size={16} />
-                  <div className="content">
-                    <span className="label">Parent Code</span>
-                    <span className="value">
-                      {selectedSubdivisionModal.parentCode || 'None'}
-                    </span>
-                  </div>
-                </ModalDetailItem>
-              </ModalDetailGrid>
-
-              <ModalSection>
-                <ModalSectionTitle>
-                  <ExternalLink size={16} />
-                  Flag Information
-                </ModalSectionTitle>
-                <ModalDetailItem>
-                  <Flag className="icon" size={16} />
-                  <div className="content">
-                    <span className="label">Flag URL</span>
-                    <span className="value">
-                      <a 
-                        href={selectedSubdivisionModal.flag || iso3166Service.getSubdivisionFlagUrl(getCountryCode(), selectedSubdivisionModal.code)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{ color: '#667eea', textDecoration: 'none', wordBreak: 'break-all' }}
-                      >
-                        {selectedSubdivisionModal.flag || iso3166Service.getSubdivisionFlagUrl(getCountryCode(), selectedSubdivisionModal.code)}
-                      </a>
-                    </span>
-                  </div>
-                </ModalDetailItem>
-              </ModalSection>
-
-              {selectedSubdivisionModal.history && selectedSubdivisionModal.history.length > 0 && (
-                <ModalSection>
-                  <ModalSectionTitle>
-                    <Calendar size={16} />
-                    History ({selectedSubdivisionModal.history.length} {selectedSubdivisionModal.history.length === 1 ? 'entry' : 'entries'})
-                  </ModalSectionTitle>
-                  <div style={{ background: '#f8f9fa', borderRadius: '8px', padding: '16px' }}>
-                    {selectedSubdivisionModal.history.map((historyEntry: any, index: number) => (
-                      <div key={index} style={{ marginBottom: index < selectedSubdivisionModal.history.length - 1 ? '8px' : '0', fontSize: '14px', color: '#666' }}>
-                        {typeof historyEntry === 'string' ? historyEntry : (
-                          <>
-                            {historyEntry['Date Issued'] && <div><strong>Date:</strong> {historyEntry['Date Issued']}</div>}
-                            {historyEntry.Change && <div><strong>Change:</strong> {historyEntry.Change}</div>}
-                            {historyEntry['Description of Change'] && <div><strong>Description:</strong> {historyEntry['Description of Change']}</div>}
-                            {historyEntry.Source && <div><strong>Source:</strong> {historyEntry.Source}</div>}
-                          </>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </ModalSection>
-              )}
-
-              <ModalSection>
-                <ModalSectionTitle>
-                  <Code size={16} />
-                  Raw JSON Data
-                </ModalSectionTitle>
-                <div style={{ 
-                  background: '#f8f9fa', 
-                  border: '1px solid #e9ecef', 
-                  borderRadius: '8px', 
-                  padding: '16px',
-                  fontFamily: 'monospace',
-                  fontSize: '12px',
-                  maxHeight: '300px',
-                  overflow: 'auto',
-                  whiteSpace: 'pre-wrap',
-                  color: '#495057'
-                }}>
-                  {JSON.stringify(selectedSubdivisionModal, null, 2)}
-                </div>
-              </ModalSection>
-            </ModalBody>
-          </ModalContent>
-        </ModalOverlay>
+        <SubdivisionModal
+          subdivision={selectedSubdivisionModal}
+          subdivisions={subdivisions}
+          currentIndex={currentSubdivisionIndex}
+          countryCode={getCountryCode()}
+          onClose={closeModal}
+          onNavigateNext={navigateToNext}
+          onNavigatePrevious={navigateToPrevious}
+        />
       )}
     </InfoContainer>
   );
