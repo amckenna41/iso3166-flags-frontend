@@ -511,7 +511,7 @@ const SubdivisionModal: React.FC<SubdivisionModalProps> = ({
                   padding: '16px',
                 }}
               >
-                {subdivision.history.map((entry: any, index: number) => (
+                {subdivision.history.map((entry, index) => (
                   <div
                     key={index}
                     style={{
@@ -521,32 +521,26 @@ const SubdivisionModal: React.FC<SubdivisionModalProps> = ({
                       color: '#666',
                     }}
                   >
-                    {typeof entry === 'string' ? (
-                      entry
-                    ) : (
-                      <>
-                        {entry['Date Issued'] && (
-                          <div>
-                            <strong>Date:</strong> {entry['Date Issued']}
-                          </div>
-                        )}
-                        {entry.Change && (
-                          <div>
-                            <strong>Change:</strong> {entry.Change}
-                          </div>
-                        )}
-                        {entry['Description of Change'] && (
-                          <div>
-                            <strong>Description:</strong>{' '}
-                            {entry['Description of Change']}
-                          </div>
-                        )}
-                        {entry.Source && (
-                          <div>
-                            <strong>Source:</strong> {entry.Source}
-                          </div>
-                        )}
-                      </>
+                    {entry['Date Issued'] && (
+                      <div>
+                        <strong>Date:</strong> {entry['Date Issued']}
+                      </div>
+                    )}
+                    {entry.Change && (
+                      <div>
+                        <strong>Change:</strong> {entry.Change}
+                      </div>
+                    )}
+                    {entry['Description of Change'] && (
+                      <div>
+                        <strong>Description:</strong>{' '}
+                        {entry['Description of Change']}
+                      </div>
+                    )}
+                    {entry.Source && (
+                      <div>
+                        <strong>Source:</strong> {entry.Source}
+                      </div>
                     )}
                   </div>
                 ))}

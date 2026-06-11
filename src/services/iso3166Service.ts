@@ -38,9 +38,10 @@ export interface RestCountryData {
 
 // Types for the data structures
 export interface SubdivisionHistory {
-  edition: string;
-  description: string;
-  date?: string;
+  'Date Issued'?: string;
+  Change?: string;
+  'Description of Change'?: string;
+  Source?: string;
 }
 
 export interface SubdivisionData {

@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import styled, { keyframes } from 'styled-components';
-import { X, MapPin, Flag, Globe, Users, Calendar, ExternalLink, Code, Building2, Compass, Ruler, Clock, DollarSign, Languages, Copy, Check, ArrowUpDown, Globe2, Star } from 'lucide-react';
+import { X, MapPin, Flag, Globe, Users, Calendar, ExternalLink, Code, Building2, Compass, Ruler, Clock, DollarSign, Languages, Copy, Check, ArrowUpDown, Globe2, Star, ChevronUp } from 'lucide-react';
 import { CountryData, RestCountryData, SubdivisionData, iso3166Service } from '../services/iso3166Service';
 import APP_CONFIG from '../config/appConfig';
 import DemoInfo from './DemoInfo';
@@ -737,6 +737,30 @@ const LoadMoreHint = styled.div`
   padding: 12px;
   font-size: 12px;
   color: #adb5bd;
+`;
+
+const ScrollToTopButton = styled.button`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 16px;
+  padding: 10px 16px;
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  color: #495057;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+
+  &:hover {
+    background: #667eea;
+    border-color: #667eea;
+    color: white;
+  }
 `;
 
 // ── Collapsible header body ───────────────────────────────────────────────────
@@ -1482,16 +1506,12 @@ const CountryInfo: React.FC<CountryInfoProps> = ({ countryName, countryData, cou
                             History ({subdivision.history.length} {subdivision.history.length === 1 ? 'entry' : 'entries'})
                           </HistoryTitle>
                           <HistoryList>
-                            {subdivision.history.map((historyEntry: any, index: number) => (
+                            {subdivision.history.map((historyEntry, index) => (
                               <HistoryItem key={index}>
-                                {typeof historyEntry === 'string' ? historyEntry : (
-                                  <>
-                                    {historyEntry['Date Issued'] && <div><strong>Date:</strong> {historyEntry['Date Issued']}</div>}
-                                    {historyEntry.Change && <div><strong>Change:</strong> {historyEntry.Change}</div>}
-                                    {historyEntry['Description of Change'] && <div><strong>Description:</strong> {historyEntry['Description of Change']}</div>}
-                                    {historyEntry.Source && <div><strong>Source:</strong> {historyEntry.Source}</div>}
-                                  </>
-                                )}
+                                {historyEntry['Date Issued'] && <div><strong>Date:</strong> {historyEntry['Date Issued']}</div>}
+                                {historyEntry.Change && <div><strong>Change:</strong> {historyEntry.Change}</div>}
+                                {historyEntry['Description of Change'] && <div><strong>Description:</strong> {historyEntry['Description of Change']}</div>}
+                                {historyEntry.Source && <div><strong>Source:</strong> {historyEntry.Source}</div>}
                               </HistoryItem>
                             ))}
                           </HistoryList>
@@ -1520,6 +1540,15 @@ const CountryInfo: React.FC<CountryInfoProps> = ({ countryName, countryData, cou
                 <LoadMoreHint>
                   Showing {visibleCount} of {filteredSubdivisions.length} — scroll to load more
                 </LoadMoreHint>
+              )}
+
+              {filteredSubdivisions.length > 0 && visibleCount >= filteredSubdivisions.length && (
+                <ScrollToTopButton
+                  onClick={() => contentRef.current?.scrollTo({ top: 0, behavior: 'smooth' })}
+                >
+                  <ChevronUp size={15} />
+                  Back to top
+                </ScrollToTopButton>
               )}
             </SubdivisionsContainer>
           </>
