@@ -1,6 +1,6 @@
 import React from 'react';
 import styled from 'styled-components';
-import { Github, Info } from 'lucide-react';
+import { Github, Info, Columns3 } from 'lucide-react';
 
 const HeaderContainer = styled.header`
   position: absolute;
@@ -147,9 +147,10 @@ const InfoButton = styled.button`
 
 interface AppHeaderProps {
   onInfoClick?: () => void;
+  onCompareClick?: () => void;
 }
 
-const AppHeader: React.FC<AppHeaderProps> = ({ onInfoClick }) => {
+const AppHeader: React.FC<AppHeaderProps> = ({ onInfoClick, onCompareClick }) => {
   return (
     <HeaderContainer>
       <Logo>
@@ -184,8 +185,14 @@ const AppHeader: React.FC<AppHeaderProps> = ({ onInfoClick }) => {
           <Github size={20} />
           Subdivision API
         </NavLink>
+        {onCompareClick && (
+          <InfoButton type="button" onClick={onCompareClick} title="Compare countries side by side">
+            <Columns3 size={16} />
+            Compare
+          </InfoButton>
+        )}
         {onInfoClick && (
-          <InfoButton onClick={onInfoClick}>
+          <InfoButton type="button" onClick={onInfoClick}>
             <Info size={16} />
             About
           </InfoButton>

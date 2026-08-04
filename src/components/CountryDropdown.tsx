@@ -1,8 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
 import { ChevronDown, Globe, X, Clock, Star } from 'lucide-react';
 import { iso3166Service } from '../services/iso3166Service';
 import { FAVOURITES_KEY } from './CountryInfo';
+import { COUNTRIES } from '../data/countries';
+import { readCountryList, writeCountryList, StoredCountry } from '../utils/storage';
+import { scrollIntoViewIfSupported } from '../utils/dom';
 
 const RECENT_KEY = 'iso3166_recent_countries';
 const MAX_RECENT = 5;
@@ -30,9 +33,13 @@ const DropdownContainer = styled.div`
   }
 `;
 
-const DropdownButton = styled.button`
+const TriggerRow = styled.div`
+  position: relative;
+`;
+
+const DropdownButton = styled.button<{ $hasClear?: boolean }>`
   width: 100%;
-  padding: 12px 16px;
+  padding: 12px ${props => (props.$hasClear ? '58px' : '16px')} 12px 16px;
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(10px);
   border: 1px solid #e0e0e0;
@@ -79,15 +86,15 @@ const DropdownList = styled.div<{ $isOpen: boolean }>`
   z-index: 1001;
 `;
 
-const DropdownItem = styled.button`
+const DropdownItem = styled.button<{ $active?: boolean }>`
   width: 100%;
   padding: 10px 16px;
-  background: none;
+  background: ${props => (props.$active ? 'rgba(102, 126, 234, 0.14)' : 'none')};
   border: none;
   text-align: left;
   cursor: pointer;
   font-size: 14px;
-  color: #374151;
+  color: ${props => (props.$active ? '#667eea' : '#374151')};
   transition: background-color 0.2s;
   display: flex;
   align-items: center;
@@ -115,22 +122,31 @@ const FlagImage = styled.img`
   flex-shrink: 0;
 `;
 
-const ClearButton = styled.span`
+const ClearButton = styled.button`
+  position: absolute;
+  right: 34px;
+  top: 50%;
+  transform: translateY(-50%);
   background: none;
   border: none;
   color: #999;
   cursor: pointer;
-  padding: 4px 8px;
+  padding: 4px 6px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 4px;
   transition: all 0.2s;
-  margin-left: 4px;
+  z-index: 1;
 
   &:hover {
     background: rgba(102, 126, 234, 0.1);
     color: #667eea;
+  }
+
+  &:focus-visible {
+    outline: 2px solid #667eea;
+    outline-offset: 1px;
   }
 
   &:active {
@@ -185,239 +201,6 @@ interface CountryDropdownProps {
   selectedCountry?: string;
 }
 
-// Country list with codes and names
-const COUNTRIES = [
-  { code: 'AD', name: 'Andorra' },
-  { code: 'AE', name: 'United Arab Emirates' },
-  { code: 'AF', name: 'Afghanistan' },
-  { code: 'AG', name: 'Antigua and Barbuda' },
-  { code: 'AI', name: 'Anguilla' },
-  { code: 'AL', name: 'Albania' },
-  { code: 'AM', name: 'Armenia' },
-  { code: 'AO', name: 'Angola' },
-  { code: 'AR', name: 'Argentina' },
-  { code: 'AS', name: 'American Samoa' },
-  { code: 'AT', name: 'Austria' },
-  { code: 'AU', name: 'Australia' },
-  { code: 'AW', name: 'Aruba' },
-  { code: 'AZ', name: 'Azerbaijan' },
-  { code: 'BA', name: 'Bosnia and Herzegovina' },
-  { code: 'BB', name: 'Barbados' },
-  { code: 'BD', name: 'Bangladesh' },
-  { code: 'BE', name: 'Belgium' },
-  { code: 'BF', name: 'Burkina Faso' },
-  { code: 'BG', name: 'Bulgaria' },
-  { code: 'BH', name: 'Bahrain' },
-  { code: 'BI', name: 'Burundi' },
-  { code: 'BJ', name: 'Benin' },
-  { code: 'BM', name: 'Bermuda' },
-  { code: 'BN', name: 'Brunei' },
-  { code: 'BO', name: 'Bolivia' },
-  { code: 'BR', name: 'Brazil' },
-  { code: 'BS', name: 'Bahamas' },
-  { code: 'BT', name: 'Bhutan' },
-  { code: 'BW', name: 'Botswana' },
-  { code: 'BY', name: 'Belarus' },
-  { code: 'BZ', name: 'Belize' },
-  { code: 'CA', name: 'Canada' },
-  { code: 'CD', name: 'Democratic Republic of the Congo' },
-  { code: 'CF', name: 'Central African Republic' },
-  { code: 'CG', name: 'Republic of the Congo' },
-  { code: 'CH', name: 'Switzerland' },
-  { code: 'CI', name: 'Côte d\'Ivoire' },
-  { code: 'CL', name: 'Chile' },
-  { code: 'CM', name: 'Cameroon' },
-  { code: 'CN', name: 'China' },
-  { code: 'CO', name: 'Colombia' },
-  { code: 'CR', name: 'Costa Rica' },
-  { code: 'CU', name: 'Cuba' },
-  { code: 'CV', name: 'Cape Verde' },
-  { code: 'CY', name: 'Cyprus' },
-  { code: 'CZ', name: 'Czech Republic' },
-  { code: 'DE', name: 'Germany' },
-  { code: 'DJ', name: 'Djibouti' },
-  { code: 'DK', name: 'Denmark' },
-  { code: 'DM', name: 'Dominica' },
-  { code: 'DO', name: 'Dominican Republic' },
-  { code: 'DZ', name: 'Algeria' },
-  { code: 'EC', name: 'Ecuador' },
-  { code: 'EE', name: 'Estonia' },
-  { code: 'EG', name: 'Egypt' },
-  { code: 'ER', name: 'Eritrea' },
-  { code: 'ES', name: 'Spain' },
-  { code: 'ET', name: 'Ethiopia' },
-  { code: 'FI', name: 'Finland' },
-  { code: 'FJ', name: 'Fiji' },
-  { code: 'FK', name: 'Falkland Islands' },
-  { code: 'FM', name: 'Micronesia' },
-  { code: 'FO', name: 'Faroe Islands' },
-  { code: 'FR', name: 'France' },
-  { code: 'GA', name: 'Gabon' },
-  { code: 'GB', name: 'United Kingdom' },
-  { code: 'GD', name: 'Grenada' },
-  { code: 'GE', name: 'Georgia' },
-  { code: 'GF', name: 'French Guiana' },
-  { code: 'GH', name: 'Ghana' },
-  { code: 'GI', name: 'Gibraltar' },
-  { code: 'GL', name: 'Greenland' },
-  { code: 'GM', name: 'Gambia' },
-  { code: 'GN', name: 'Guinea' },
-  { code: 'GP', name: 'Guadeloupe' },
-  { code: 'GQ', name: 'Equatorial Guinea' },
-  { code: 'GR', name: 'Greece' },
-  { code: 'GT', name: 'Guatemala' },
-  { code: 'GU', name: 'Guam' },
-  { code: 'GW', name: 'Guinea-Bissau' },
-  { code: 'GY', name: 'Guyana' },
-  { code: 'HK', name: 'Hong Kong' },
-  { code: 'HN', name: 'Honduras' },
-  { code: 'HR', name: 'Croatia' },
-  { code: 'HT', name: 'Haiti' },
-  { code: 'HU', name: 'Hungary' },
-  { code: 'ID', name: 'Indonesia' },
-  { code: 'IE', name: 'Ireland' },
-  { code: 'IL', name: 'Israel' },
-  { code: 'IN', name: 'India' },
-  { code: 'IQ', name: 'Iraq' },
-  { code: 'IR', name: 'Iran' },
-  { code: 'IS', name: 'Iceland' },
-  { code: 'IT', name: 'Italy' },
-  { code: 'JM', name: 'Jamaica' },
-  { code: 'JO', name: 'Jordan' },
-  { code: 'JP', name: 'Japan' },
-  { code: 'KE', name: 'Kenya' },
-  { code: 'KG', name: 'Kyrgyzstan' },
-  { code: 'KH', name: 'Cambodia' },
-  { code: 'KI', name: 'Kiribati' },
-  { code: 'KM', name: 'Comoros' },
-  { code: 'KN', name: 'Saint Kitts and Nevis' },
-  { code: 'KP', name: 'North Korea' },
-  { code: 'KR', name: 'South Korea' },
-  { code: 'KW', name: 'Kuwait' },
-  { code: 'KY', name: 'Cayman Islands' },
-  { code: 'KZ', name: 'Kazakhstan' },
-  { code: 'LA', name: 'Laos' },
-  { code: 'LB', name: 'Lebanon' },
-  { code: 'LC', name: 'Saint Lucia' },
-  { code: 'LI', name: 'Liechtenstein' },
-  { code: 'LK', name: 'Sri Lanka' },
-  { code: 'LR', name: 'Liberia' },
-  { code: 'LS', name: 'Lesotho' },
-  { code: 'LT', name: 'Lithuania' },
-  { code: 'LU', name: 'Luxembourg' },
-  { code: 'LV', name: 'Latvia' },
-  { code: 'LY', name: 'Libya' },
-  { code: 'MA', name: 'Morocco' },
-  { code: 'MC', name: 'Monaco' },
-  { code: 'MD', name: 'Moldova' },
-  { code: 'ME', name: 'Montenegro' },
-  { code: 'MG', name: 'Madagascar' },
-  { code: 'MH', name: 'Marshall Islands' },
-  { code: 'MK', name: 'North Macedonia' },
-  { code: 'ML', name: 'Mali' },
-  { code: 'MM', name: 'Myanmar' },
-  { code: 'MN', name: 'Mongolia' },
-  { code: 'MO', name: 'Macao' },
-  { code: 'MP', name: 'Northern Mariana Islands' },
-  { code: 'MQ', name: 'Martinique' },
-  { code: 'MR', name: 'Mauritania' },
-  { code: 'MS', name: 'Montserrat' },
-  { code: 'MT', name: 'Malta' },
-  { code: 'MU', name: 'Mauritius' },
-  { code: 'MV', name: 'Maldives' },
-  { code: 'MW', name: 'Malawi' },
-  { code: 'MX', name: 'Mexico' },
-  { code: 'MY', name: 'Malaysia' },
-  { code: 'MZ', name: 'Mozambique' },
-  { code: 'NA', name: 'Namibia' },
-  { code: 'NC', name: 'New Caledonia' },
-  { code: 'NE', name: 'Niger' },
-  { code: 'NF', name: 'Norfolk Island' },
-  { code: 'NG', name: 'Nigeria' },
-  { code: 'NI', name: 'Nicaragua' },
-  { code: 'NL', name: 'Netherlands' },
-  { code: 'NO', name: 'Norway' },
-  { code: 'NP', name: 'Nepal' },
-  { code: 'NR', name: 'Nauru' },
-  { code: 'NU', name: 'Niue' },
-  { code: 'NZ', name: 'New Zealand' },
-  { code: 'OM', name: 'Oman' },
-  { code: 'PA', name: 'Panama' },
-  { code: 'PE', name: 'Peru' },
-  { code: 'PF', name: 'French Polynesia' },
-  { code: 'PG', name: 'Papua New Guinea' },
-  { code: 'PH', name: 'Philippines' },
-  { code: 'PK', name: 'Pakistan' },
-  { code: 'PL', name: 'Poland' },
-  { code: 'PM', name: 'Saint Pierre and Miquelon' },
-  { code: 'PN', name: 'Pitcairn Islands' },
-  { code: 'PR', name: 'Puerto Rico' },
-  { code: 'PS', name: 'Palestine' },
-  { code: 'PT', name: 'Portugal' },
-  { code: 'PW', name: 'Palau' },
-  { code: 'PY', name: 'Paraguay' },
-  { code: 'QA', name: 'Qatar' },
-  { code: 'RE', name: 'Réunion' },
-  { code: 'RO', name: 'Romania' },
-  { code: 'RS', name: 'Serbia' },
-  { code: 'RU', name: 'Russia' },
-  { code: 'RW', name: 'Rwanda' },
-  { code: 'SA', name: 'Saudi Arabia' },
-  { code: 'SB', name: 'Solomon Islands' },
-  { code: 'SC', name: 'Seychelles' },
-  { code: 'SD', name: 'Sudan' },
-  { code: 'SE', name: 'Sweden' },
-  { code: 'SG', name: 'Singapore' },
-  { code: 'SH', name: 'Saint Helena' },
-  { code: 'SI', name: 'Slovenia' },
-  { code: 'SK', name: 'Slovakia' },
-  { code: 'SL', name: 'Sierra Leone' },
-  { code: 'SM', name: 'San Marino' },
-  { code: 'SN', name: 'Senegal' },
-  { code: 'SO', name: 'Somalia' },
-  { code: 'SR', name: 'Suriname' },
-  { code: 'SS', name: 'South Sudan' },
-  { code: 'ST', name: 'São Tomé and Príncipe' },
-  { code: 'SV', name: 'El Salvador' },
-  { code: 'SX', name: 'Sint Maarten' },
-  { code: 'SY', name: 'Syria' },
-  { code: 'SZ', name: 'Eswatini' },
-  { code: 'TC', name: 'Turks and Caicos Islands' },
-  { code: 'TD', name: 'Chad' },
-  { code: 'TG', name: 'Togo' },
-  { code: 'TH', name: 'Thailand' },
-  { code: 'TJ', name: 'Tajikistan' },
-  { code: 'TK', name: 'Tokelau' },
-  { code: 'TL', name: 'East Timor' },
-  { code: 'TM', name: 'Turkmenistan' },
-  { code: 'TN', name: 'Tunisia' },
-  { code: 'TO', name: 'Tonga' },
-  { code: 'TR', name: 'Turkey' },
-  { code: 'TT', name: 'Trinidad and Tobago' },
-  { code: 'TV', name: 'Tuvalu' },
-  { code: 'TW', name: 'Taiwan' },
-  { code: 'TZ', name: 'Tanzania' },
-  { code: 'UA', name: 'Ukraine' },
-  { code: 'UG', name: 'Uganda' },
-  { code: 'UM', name: 'U.S. Minor Outlying Islands' },
-  { code: 'US', name: 'United States' },
-  { code: 'UY', name: 'Uruguay' },
-  { code: 'UZ', name: 'Uzbekistan' },
-  { code: 'VA', name: 'Vatican City' },
-  { code: 'VC', name: 'Saint Vincent and the Grenadines' },
-  { code: 'VE', name: 'Venezuela' },
-  { code: 'VG', name: 'British Virgin Islands' },
-  { code: 'VI', name: 'U.S. Virgin Islands' },
-  { code: 'VN', name: 'Vietnam' },
-  { code: 'VU', name: 'Vanuatu' },
-  { code: 'WF', name: 'Wallis and Futuna' },
-  { code: 'WS', name: 'Samoa' },
-  { code: 'YE', name: 'Yemen' },
-  { code: 'YT', name: 'Mayotte' },
-  { code: 'ZA', name: 'South Africa' },
-  { code: 'ZM', name: 'Zambia' },
-  { code: 'ZW', name: 'Zimbabwe' }
-];
 
 const CountryDropdown: React.FC<CountryDropdownProps> = ({
   onCountrySelect,
@@ -426,32 +209,17 @@ const CountryDropdown: React.FC<CountryDropdownProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const [selectedCountryName, setSelectedCountryName] = useState('Select a country');
   const [searchTerm, setSearchTerm] = useState('');
-  const [recentCountries, setRecentCountries] = useState<{ code: string; name: string }[]>(() => {
-    try {
-      const stored = localStorage.getItem(RECENT_KEY);
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
-  });
-
-  const [favouriteCountries, setFavouriteCountries] = useState<{ code: string; name: string }[]>(() => {
-    try {
-      const stored = localStorage.getItem(FAVOURITES_KEY);
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const listRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  // readCountryList validates shape — a tampered or stale entry parses fine but
+  // would otherwise blow up on .map() during render.
+  const [recentCountries, setRecentCountries] = useState<StoredCountry[]>(() => readCountryList(RECENT_KEY));
+  const [favouriteCountries, setFavouriteCountries] = useState<StoredCountry[]>(() => readCountryList(FAVOURITES_KEY));
 
   // Stay in sync when CountryInfo toggles a favourite
   useEffect(() => {
-    const refresh = () => {
-      try {
-        const stored = localStorage.getItem(FAVOURITES_KEY);
-        setFavouriteCountries(stored ? JSON.parse(stored) : []);
-      } catch {}
-    };
+    const refresh = () => setFavouriteCountries(readCountryList(FAVOURITES_KEY));
     window.addEventListener('iso3166:favourites-changed', refresh);
     return () => window.removeEventListener('iso3166:favourites-changed', refresh);
   }, []);
@@ -463,9 +231,10 @@ const CountryDropdown: React.FC<CountryDropdownProps> = ({
         setSelectedCountryName(country.name);
         // Update recently viewed list
         setRecentCountries(prev => {
+          const entry = { code: country.code, name: country.name };
           const filtered = prev.filter(c => c.code !== country.code);
-          const updated = [country, ...filtered].slice(0, MAX_RECENT);
-          try { localStorage.setItem(RECENT_KEY, JSON.stringify(updated)); } catch {}
+          const updated = [entry, ...filtered].slice(0, MAX_RECENT);
+          writeCountryList(RECENT_KEY, updated);
           return updated;
         });
       }
@@ -497,11 +266,25 @@ const CountryDropdown: React.FC<CountryDropdownProps> = ({
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
+    setActiveIndex(-1);
   };
 
+  // Match on name, alpha-2 and alpha-3 so "IRL", "IE" and "Ireland" all work
+  const term = searchTerm.trim().toLowerCase();
   const filteredCountries = COUNTRIES.filter(country =>
-    country.name.toLowerCase().includes(searchTerm.toLowerCase())
+    country.name.toLowerCase().includes(term) ||
+    country.code.toLowerCase().startsWith(term) ||
+    country.alpha3.toLowerCase().startsWith(term)
   ).sort((a, b) => a.name.localeCompare(b.name));
+
+  // Favourites and Recents only show when not searching, so the keyboard
+  // navigation order has to be built from the same condition the list renders.
+  const showSections = !searchTerm;
+  const navOptions: { code: string; name: string; key: string }[] = [
+    ...(showSections ? favouriteCountries.map(c => ({ ...c, key: `fav-${c.code}` })) : []),
+    ...(showSections ? recentCountries.map(c => ({ ...c, key: `recent-${c.code}` })) : []),
+    ...filteredCountries.map(c => ({ code: c.code, name: c.name, key: c.code })),
+  ];
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -521,120 +304,181 @@ const CountryDropdown: React.FC<CountryDropdownProps> = ({
     };
   }, [isOpen]);
 
+  // Focus the filter box on open, and keep the highlighted option in view
+  useEffect(() => {
+    if (isOpen) searchInputRef.current?.focus();
+    else setActiveIndex(-1);
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (activeIndex < 0 || !listRef.current) return;
+    scrollIntoViewIfSupported(
+      listRef.current.querySelector(`[data-index="${activeIndex}"]`),
+      { block: 'nearest' }
+    );
+  }, [activeIndex]);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      setIsOpen(false);
+      setActiveIndex(-1);
+      return;
+    }
+    if (!isOpen) {
+      if (e.key === 'ArrowDown' || e.key === 'Enter') {
+        e.preventDefault();
+        setIsOpen(true);
+      }
+      return;
+    }
+    if (navOptions.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActiveIndex(prev => (prev + 1) % navOptions.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveIndex(prev => (prev <= 0 ? navOptions.length - 1 : prev - 1));
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      setActiveIndex(0);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      setActiveIndex(navOptions.length - 1);
+    } else if (e.key === 'Enter' && activeIndex >= 0) {
+      e.preventDefault();
+      const option = navOptions[activeIndex];
+      handleCountryClick({ code: option.code, name: option.name });
+    }
+  };
+
+  const hasSelection = selectedCountryName !== 'Select a country';
+
+  // key -> flat navigation index, so arrow keys and the rendered rows agree
+  const indexByKey = new Map(navOptions.map((o, i) => [o.key, i]));
+
+  const renderOption = (country: { code: string; name: string }, key: string) => {
+    const index = indexByKey.get(key) ?? -1;
+    return (
+      <DropdownItem
+        key={key}
+        id={`country-option-${key}`}
+        role="option"
+        data-index={index}
+        aria-selected={index === activeIndex}
+        $active={index === activeIndex}
+        onMouseEnter={() => setActiveIndex(index)}
+        onClick={() => handleCountryClick(country)}
+        // Only the main list carries the test id — favourites and recents would
+        // otherwise duplicate it for the same country.
+        data-testid={key === country.code ? `country-option-${country.code}` : undefined}
+      >
+        <FlagImage
+          src={iso3166Service.getCountryFlagUrl(country.code)}
+          alt={`${country.name} flag`}
+          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+        />
+        {country.name}
+        <span style={{ color: '#999', fontSize: '12px', marginLeft: 'auto' }}>[{country.code}]</span>
+      </DropdownItem>
+    );
+  };
+
   return (
-    <DropdownContainer data-dropdown="country-dropdown">
-      <DropdownButton onClick={handleToggle} data-testid="country-dropdown-trigger" aria-haspopup="listbox" aria-expanded={isOpen}>
-        <ButtonContent>
-          {selectedCountryName !== 'Select a country' ? (
-            <FlagImage 
-              src={iso3166Service.getCountryFlagUrl(selectedCountry || '')} 
-              alt={`${selectedCountryName} flag`}
-              onError={(e) => {
-                const img = e.target as HTMLImageElement;
-                img.style.display = 'none';
-              }}
-            />
-          ) : (
-            <Globe size={16} />
-          )}
-          <span>
-            {selectedCountryName}
-            {selectedCountryName !== 'Select a country' && selectedCountry && (
-              <span style={{ color: '#999', fontSize: '12px', marginLeft: '4px' }}>
-                [{selectedCountry.toUpperCase()}]
-              </span>
+    <DropdownContainer data-dropdown="country-dropdown" onKeyDown={handleKeyDown}>
+      {/* The clear control is a sibling, not a child, of the trigger button —
+          a button inside a button is invalid HTML and swallows keyboard events. */}
+      <TriggerRow>
+        <DropdownButton
+          onClick={handleToggle}
+          data-testid="country-dropdown-trigger"
+          aria-haspopup="listbox"
+          aria-expanded={isOpen}
+          aria-controls="country-dropdown-list"
+          $hasClear={hasSelection}
+        >
+          <ButtonContent>
+            {hasSelection ? (
+              <FlagImage
+                src={iso3166Service.getCountryFlagUrl(selectedCountry || '')}
+                alt={`${selectedCountryName} flag`}
+                onError={(e) => {
+                  const img = e.target as HTMLImageElement;
+                  img.style.display = 'none';
+                }}
+              />
+            ) : (
+              <Globe size={16} />
             )}
-          </span>
-        </ButtonContent>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-          {selectedCountryName !== 'Select a country' && (
-            <ClearButton
-              onClick={handleClear}
-              title="Clear selection"
-              data-testid="country-dropdown-clear"
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleClear(e as any); }}
-            >
-              <X size={16} />
-            </ClearButton>
-          )}
+            <span>
+              {selectedCountryName}
+              {hasSelection && selectedCountry && (
+                <span style={{ color: '#999', fontSize: '12px', marginLeft: '4px' }}>
+                  [{selectedCountry.toUpperCase()}]
+                </span>
+              )}
+            </span>
+          </ButtonContent>
           <ChevronIcon size={16} $isOpen={isOpen} />
-        </div>
-      </DropdownButton>
-      
-      <DropdownList $isOpen={isOpen} data-testid="country-dropdown-list">
-        {favouriteCountries.length > 0 && !searchTerm && (
+        </DropdownButton>
+        {hasSelection && (
+          <ClearButton
+            type="button"
+            onClick={handleClear}
+            title="Clear selection"
+            aria-label="Clear country selection"
+            data-testid="country-dropdown-clear"
+          >
+            <X size={16} />
+          </ClearButton>
+        )}
+      </TriggerRow>
+
+      <DropdownList
+        ref={listRef}
+        id="country-dropdown-list"
+        role="listbox"
+        aria-label="Countries"
+        $isOpen={isOpen}
+        data-testid="country-dropdown-list"
+      >
+        {showSections && favouriteCountries.length > 0 && (
           <>
             <RecentsLabel>
               <Star size={11} />
               Favourites
             </RecentsLabel>
-            {favouriteCountries.map(country => (
-              <DropdownItem
-                key={`fav-${country.code}`}
-                onClick={() => handleCountryClick(country)}
-              >
-                <FlagImage
-                  src={iso3166Service.getCountryFlagUrl(country.code)}
-                  alt={`${country.name} flag`}
-                  onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                />
-                {country.name}
-                <span style={{ color: '#999', fontSize: '12px', marginLeft: 'auto' }}>[{country.code}]</span>
-              </DropdownItem>
-            ))}
+            {favouriteCountries.map(country => renderOption(country, `fav-${country.code}`))}
             <RecentsDivider />
           </>
         )}
-        {recentCountries.length > 0 && !searchTerm && (
+        {showSections && recentCountries.length > 0 && (
           <>
             <RecentsLabel>
               <Clock size={11} />
               Recent
             </RecentsLabel>
-            {recentCountries.map(country => (
-              <DropdownItem
-                key={`recent-${country.code}`}
-                onClick={() => handleCountryClick(country)}
-              >
-                <FlagImage
-                  src={iso3166Service.getCountryFlagUrl(country.code)}
-                  alt={`${country.name} flag`}
-                  onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                />
-                {country.name}
-                <span style={{ color: '#999', fontSize: '12px', marginLeft: 'auto' }}>[{country.code}]</span>
-              </DropdownItem>
-            ))}
+            {recentCountries.map(country => renderOption(country, `recent-${country.code}`))}
             <RecentsDivider />
           </>
         )}
         <SearchInput
+          ref={searchInputRef}
           type="text"
-          placeholder="Type to search countries..."
+          placeholder="Type to search countries by name or code..."
           value={searchTerm}
           onChange={handleSearchChange}
           onClick={(e) => e.stopPropagation()}
+          aria-label="Filter countries"
+          aria-controls="country-dropdown-list"
+          aria-activedescendant={
+            activeIndex >= 0 && navOptions[activeIndex]
+              ? `country-option-${navOptions[activeIndex].key}`
+              : undefined
+          }
           data-testid="country-dropdown-search"
         />
-        {filteredCountries.map((country) => (
-          <DropdownItem
-            key={country.code}
-            onClick={() => handleCountryClick(country)}
-            data-testid={`country-option-${country.code}`}
-          >
-            <FlagImage 
-              src={iso3166Service.getCountryFlagUrl(country.code)} 
-              alt={`${country.name} flag`}
-              onError={(e) => {
-                const img = e.target as HTMLImageElement;
-                img.style.display = 'none';
-              }}
-            />
-            {country.name} <span style={{ color: '#999', fontSize: '12px' }}>[{country.code}]</span>
-          </DropdownItem>
-        ))}
+        {filteredCountries.map(country => renderOption(country, country.code))}
       </DropdownList>
     </DropdownContainer>
   );

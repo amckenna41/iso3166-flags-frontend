@@ -7,13 +7,15 @@ graph TB
     subgraph Browser["Browser"]
         subgraph SPA["React SPA"]
             App["App.tsx\n(root)"]
+            EBD["ErrorBoundary\nWraps app · map · info panel · comparison"]
 
             subgraph Orchestrator["State Orchestrator"]
                 IM["InteractiveMap.tsx\nHolds all app state\nURL ↔ state sync"]
             end
 
             subgraph UILayer["UI Layer"]
-                AH["AppHeader\nBranding · Nav links"]
+                AH["AppHeader\nBranding · Nav links · Compare"]
+                CC["CountryComparison\nUp to 4 countries side by side\nCSV / JSON export"]
                 JVM["JSVectorMapComponent\njsvectormap world map\nClick · Hover · Auto-zoom"]
                 CD["CountryDropdown\nFavourites · Recents · Search"]
                 SD["SubdivisionDropdown\nFiltered by selected country"]
@@ -28,16 +30,22 @@ graph TB
             end
 
             subgraph ServiceLayer["Service & Util Layer"]
-                SVC["ISO3166Service\nAxios · 10 min in-memory cache\nRequest timeout 15 s"]
+                SVC["ISO3166Service\nAxios · 10 min in-memory cache\nIn-flight de-duplication\nRequest timeout 15 s"]
                 CFG["appConfig.ts\nFeature flags · Env vars · URLs"]
-                EXP["exportUtils.ts\nCSV / JSON formatters"]
+                EXP["exportUtils.ts\nCSV / JSON formatters\nFormula-injection escaping"]
                 ERR["errorHandler.ts\nUser-facing error messages"]
+                CTRY["data/countries.ts\nISO 3166-1 list (249)\nresolveCountry(alpha-2/3/name)"]
+                UST["utils/urlState.ts\nMerge · validate query params"]
+                STO["utils/storage.ts\nShape-validated localStorage"]
+                ULR["utils/useLatestRequest.ts\nOut-of-order response guard"]
+                DOMU["utils/dom.ts\nscrollIntoView guard"]
             end
 
             subgraph Persistence["Browser Persistence"]
                 LS1["localStorage\niso3166_favourite_countries"]
                 LS2["localStorage\niso3166_recent_countries"]
-                URL["URL query params\n?country=GB&subdivision=GB-ENG"]
+                URL["URL query params\n?country=GB&subdivision=GB-ENG\n&filter=&type=&sort="]
+                SW["service-worker.ts (workbox)\nPrecached app shell\nFlags: CacheFirst 30 d\nSubdivisions: SWR 7 d"]
             end
         end
     end
@@ -63,7 +71,9 @@ graph TB
     end
 
     %% Component tree
-    App --> IM
+    App --> EBD
+    EBD --> IM
+    IM --> CC
     IM --> AH
     IM --> JVM
     IM --> CD
@@ -76,7 +86,16 @@ graph TB
 
     %% Service wiring
     IM -->|getCountrySubdivisions| SVC
+    CC -->|getCountryInfo| SVC
+    CC -->|formatCountryForExport| EXP
     CI -->|getCountryInfo| SVC
+    IM -->|resolveCountry| CTRY
+    CD -->|country list · alpha-3 match| CTRY
+    IM -->|merge · validate| UST
+    CI -->|merge · validate| UST
+    IM -->|discard stale responses| ULR
+    CI -->|discard stale responses| ULR
+    SC -->|discard stale responses| ULR
     SC -->|searchSubdivisions| SVC
     SD -->|getCountrySubdivisions| SVC
     SVC -->|GET /api/alpha/:code| ISO_API
@@ -88,10 +107,13 @@ graph TB
     PROXY -.->|Bearer token| RC_API
 
     %% Persistence
-    CD <-->|read / write| LS2
-    CI <-->|read / write| LS1
+    CD <-->|read / write via storage.ts| LS2
+    CI <-->|read / write via storage.ts| LS1
     CD <-->|read| LS1
-    IM <-->|sync on mount + change| URL
+    IM <-->|country · subdivision| URL
+    CI <-->|filter · type · sort| URL
+    SW -.->|cached responses| ISO_API
+    SW -.->|cached images| FLAGS_CDN
 
     %% Deployment
     GH -->|on pass| VD
@@ -144,9 +166,9 @@ sequenceDiagram
     participant CDN as GitHub Flags CDN
 
     User->>CI: Click subdivision card (e.g. GB-ENG)
-    CI->>CI: Find index in subdivisions array
-    CI->>SM: Open modal (subdivision, subdivisions[], index)
-    SM->>CDN: Load flag image (PNG)
+    CI->>CI: Find index in the *filtered* subdivisions array
+    CI->>SM: Open modal (subdivision, filteredSubdivisions[], index)
+    SM->>CDN: Load flag image (SVG, <CC>/<CC>-<SUB>.svg)
     CDN-->>SM: Flag image (or 404 → placeholder)
     User->>SM: Arrow key / swipe left/right
     SM->>SM: onNavigateNext / onNavigatePrevious
@@ -169,3 +191,10 @@ sequenceDiagram
 | `CustomEvent` for favourite sync | `CountryInfo` and `CountryDropdown` stay decoupled — no prop drilling through `InteractiveMap` |
 | `IntersectionObserver` for virtual list | Renders 30 cards at a time — avoids blocking the main thread with 221 DOM nodes (UK) |
 | `Array.isArray()` guards on v5 API fields | The RestCountries v5 response structure is inconsistent across countries |
+| Merged (not replaced) query string | `InteractiveMap` owns `country`/`subdivision` while `CountryInfo` owns `filter`/`type`/`sort`. `mergeUrlState()` means the last writer no longer clobbers the other's params |
+| Token-based staleness check, not `AbortSignal` | Requests are shared and cached in `ISO3166Service`, so one caller aborting would cancel it for everyone. `useLatestRequest` discards superseded responses instead |
+| In-flight de-duplication in the service | Two components reacting to the same click both miss the cache in the same tick; without it they fire duplicate requests |
+| Shape validation on every `localStorage` read | `JSON.parse` succeeding does not mean the value has the expected shape — a tampered entry parses fine and then throws on `.map()` mid-render |
+| CSS `!important` for map selection, not polling | jsvectormap re-applies inline fill/stroke on hover. A CSS rule outranks inline styles, replacing a 100 ms `setInterval` repaint loop with an attribute toggle |
+| Error boundaries per region, not just at the root | A throw in the map, info panel or comparison leaves the rest of the app usable, with a local "Try again" |
+| Workbox service worker, production only | Flags and subdivision data are near-immutable, so caching them is a genuine win; registering in dev would serve stale bundles |

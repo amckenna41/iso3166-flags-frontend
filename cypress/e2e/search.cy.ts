@@ -26,16 +26,10 @@ const STUB_SUBDIVISIONS_RESPONSE = {
 
 describe('Search Functionality', () => {
   beforeEach(() => {
-    cy.intercept('GET', '**/iso3166-2-api.vercel.app/**', (req) => {
-      const url = req.url;
-      if (url.includes('/search') || url.includes('?q=')) {
-        req.reply({ statusCode: 200, body: STUB_SEARCH_RESPONSE });
-      } else if (url.includes('/us') || url.includes('/US')) {
-        req.reply({ statusCode: 200, body: STUB_SUBDIVISIONS_RESPONSE });
-      } else {
-        req.reply({ statusCode: 200, body: {} });
-      }
-    }).as('apiCall');
+    // Path-only patterns: the ISO 3166-2 base URL is the dev proxy
+    // (/api/iso3166-2) locally and the public API in production.
+    cy.intercept('GET', '**/search/**', { statusCode: 200, body: STUB_SEARCH_RESPONSE }).as('apiCall');
+    cy.intercept('GET', '**/alpha/*', { statusCode: 200, body: STUB_SUBDIVISIONS_RESPONSE }).as('subdivisionsCall');
     cy.visit('/');
   });
 
@@ -52,15 +46,15 @@ describe('Search Functionality', () => {
   it('should display search results', () => {
     cy.get('input[placeholder*="Search"]').type('France');
     cy.wait('@apiCall');
-    cy.get('[role="listbox"]').should('be.visible');
-    cy.get('[role="option"]').should('have.length.at.least', 1);
+    cy.get('#search-results-list').should('be.visible');
+    cy.get('#search-results-list [role="option"]').should('have.length.at.least', 1);
   });
 
   it('should clear search results on empty input', () => {
     cy.get('input[placeholder*="Search"]').type('test');
     cy.wait(300);
     cy.get('input[placeholder*="Search"]').clear();
-    cy.get('[role="listbox"]').should('not.exist');
+    cy.get('#search-results-list').should('not.exist');
   });
 
   it('should handle special characters in search', () => {
@@ -71,11 +65,11 @@ describe('Search Functionality', () => {
   it('should be case-insensitive', () => {
     cy.get('input[placeholder*="Search"]').type('FRANCE');
     cy.wait('@apiCall');
-    cy.get('[role="listbox"]').should('be.visible');
+    cy.get('#search-results-list').should('be.visible');
 
     cy.get('input[placeholder*="Search"]').clear().type('france');
     cy.wait('@apiCall');
-    cy.get('[role="listbox"]').should('be.visible');
+    cy.get('#search-results-list').should('be.visible');
   });
 
   it('should handle rapid search queries', () => {
@@ -92,8 +86,8 @@ describe('Search Functionality', () => {
   it('should display results for subdivision search', () => {
     cy.get('input[placeholder*="Search"]').type('California');
     cy.wait('@apiCall');
-    cy.get('[role="listbox"]').should('be.visible');
-    cy.get('[role="option"]').first().should('be.visible');
+    cy.get('#search-results-list').should('be.visible');
+    cy.get('#search-results-list [role="option"]').first().should('be.visible');
   });
 
   it('should be keyboard accessible', () => {
@@ -102,20 +96,24 @@ describe('Search Functionality', () => {
       .should('have.focus')
       .type('France');
     cy.wait('@apiCall');
-    cy.get('[role="listbox"]').should('be.visible');
+    cy.get('#search-results-list').should('be.visible');
   });
 
   it('should handle empty search gracefully', () => {
+    // Override the default stub: this query matches nothing upstream
+    cy.intercept('GET', '**/search/**', { statusCode: 200, body: {} }).as('emptyCall');
     cy.get('input[placeholder*="Search"]').type('zzzzzzzzzz');
-    cy.wait('@apiCall');
-    cy.get('[role="listbox"]').should('be.visible');
-    cy.contains('No subdivisions found').should('be.visible');
+    cy.wait('@emptyCall');
+    cy.get('#search-results-list').should('be.visible');
+    cy.contains('No subdivisions found matching your search').should('be.visible');
   });
 
   it('should update results in real-time', () => {
+    // A bare 2-letter term is treated as a country code, so it loads that
+    // country's subdivisions rather than hitting the name-search endpoint.
     cy.get('input[placeholder*="Search"]').type('fr');
-    cy.wait('@apiCall');
-    cy.get('[role="listbox"]').should('be.visible');
+    cy.wait('@subdivisionsCall');
+    cy.get('#search-results-list').should('be.visible');
   });
 });
 

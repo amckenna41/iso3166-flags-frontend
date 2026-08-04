@@ -6,6 +6,11 @@ import APP_CONFIG from '../config/appConfig';
 import DemoInfo from './DemoInfo';
 import ExportButton from './ExportButton';
 import SubdivisionModal from './SubdivisionModal';
+import { readCountryList, writeCountryList } from '../utils/storage';
+import { scrollIntoViewIfSupported } from '../utils/dom';
+import { useLatestRequest } from '../utils/useLatestRequest';
+import { mergeUrlState, readUrlState, oneOf } from '../utils/urlState';
+import { resolveCountry } from '../data/countries';
 
 const InfoContainer = styled.div`
   height: 100%;
@@ -822,10 +827,13 @@ const CountryInfo: React.FC<CountryInfoProps> = ({ countryName, countryData, cou
   const [selectedSubdivisionModal, setSelectedSubdivisionModal] = useState<SubdivisionData | null>(null);
   const [currentSubdivisionIndex, setCurrentSubdivisionIndex] = useState<number>(0);
 
-  // Filter / sort state
-  const [filterText, setFilterText] = useState('');
-  const [typeFilter, setTypeFilter] = useState('all');
-  const [sortOrder, setSortOrder] = useState<SortOrder>('code-asc');
+  // Filter / sort state — seeded from the URL so a shared link reproduces the
+  // exact view the sender was looking at, not just the country.
+  const [filterText, setFilterText] = useState(() => readUrlState().filter ?? '');
+  const [typeFilter, setTypeFilter] = useState(() => readUrlState().type ?? 'all');
+  const [sortOrder, setSortOrder] = useState<SortOrder>(
+    () => oneOf(readUrlState().sort, SORT_ORDERS, 'code-asc')
+  );
 
   // Virtual scroll
   const [visibleCount, setVisibleCount] = useState(VIRTUAL_PAGE);
@@ -848,6 +856,8 @@ const CountryInfo: React.FC<CountryInfoProps> = ({ countryName, countryData, cou
 
   // Ref to track subdivision elements for scrolling
   const subdivisionRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+
+  const beginCountryInfoRequest = useLatestRequest();
 
   const subdivisions = useMemo(() => {
     if (!countryData) return [];
@@ -895,8 +905,11 @@ const CountryInfo: React.FC<CountryInfoProps> = ({ countryName, countryData, cou
     }));
   };
 
+  // The modal steps through the list the user is actually looking at. Using the
+  // unfiltered list made next/prev jump to cards that were not on screen and
+  // made the "3 of 47" counter disagree with the visible results.
   const handleSubdivisionClick = (subdivision: SubdivisionData) => {
-    const index = subdivisions.findIndex(sub => sub.code === subdivision.code);
+    const index = filteredSubdivisions.findIndex(sub => sub.code === subdivision.code);
     setCurrentSubdivisionIndex(index);
     setSelectedSubdivisionModal(subdivision);
   };
@@ -907,20 +920,20 @@ const CountryInfo: React.FC<CountryInfoProps> = ({ countryName, countryData, cou
   };
 
   const navigateToNext = useCallback(() => {
-    if (currentSubdivisionIndex < subdivisions.length - 1) {
+    if (currentSubdivisionIndex < filteredSubdivisions.length - 1) {
       const nextIndex = currentSubdivisionIndex + 1;
       setCurrentSubdivisionIndex(nextIndex);
-      setSelectedSubdivisionModal(subdivisions[nextIndex]);
+      setSelectedSubdivisionModal(filteredSubdivisions[nextIndex]);
     }
-  }, [currentSubdivisionIndex, subdivisions]);
+  }, [currentSubdivisionIndex, filteredSubdivisions]);
 
   const navigateToPrevious = useCallback(() => {
     if (currentSubdivisionIndex > 0) {
       const prevIndex = currentSubdivisionIndex - 1;
       setCurrentSubdivisionIndex(prevIndex);
-      setSelectedSubdivisionModal(subdivisions[prevIndex]);
+      setSelectedSubdivisionModal(filteredSubdivisions[prevIndex]);
     }
-  }, [currentSubdivisionIndex, subdivisions]);
+  }, [currentSubdivisionIndex, filteredSubdivisions]);
 
   const copyCode = useCallback((code: string) => {
     navigator.clipboard.writeText(code).then(() => {
@@ -933,30 +946,19 @@ const CountryInfo: React.FC<CountryInfoProps> = ({ countryName, countryData, cou
   useEffect(() => {
     const code = countryCode?.toUpperCase() ?? '';
     if (!code) { setIsFavourite(false); return; }
-    try {
-      const stored = localStorage.getItem(FAVOURITES_KEY);
-      const favs: { code: string; name: string }[] = stored ? JSON.parse(stored) : [];
-      setIsFavourite(favs.some(f => f.code.toUpperCase() === code));
-    } catch {
-      setIsFavourite(false);
-    }
+    setIsFavourite(readCountryList(FAVOURITES_KEY).some(f => f.code.toUpperCase() === code));
   }, [countryCode]);
 
   const toggleFavourite = useCallback(() => {
     const code = countryCode?.toUpperCase() ?? '';
     if (!code || !countryName) return;
-    try {
-      const stored = localStorage.getItem(FAVOURITES_KEY);
-      let favs: { code: string; name: string }[] = stored ? JSON.parse(stored) : [];
-      if (isFavourite) {
-        favs = favs.filter(f => f.code.toUpperCase() !== code);
-      } else {
-        favs = [{ code, name: countryName }, ...favs];
-      }
-      localStorage.setItem(FAVOURITES_KEY, JSON.stringify(favs));
-      setIsFavourite(v => !v);
-      window.dispatchEvent(new CustomEvent('iso3166:favourites-changed'));
-    } catch {}
+    const current = readCountryList(FAVOURITES_KEY);
+    const next = isFavourite
+      ? current.filter(f => f.code.toUpperCase() !== code)
+      : [{ code, name: countryName }, ...current];
+    writeCountryList(FAVOURITES_KEY, next);
+    setIsFavourite(v => !v);
+    window.dispatchEvent(new CustomEvent('iso3166:favourites-changed'));
   }, [countryCode, countryName, isFavourite]);
 
   const handleContentScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
@@ -982,20 +984,25 @@ const CountryInfo: React.FC<CountryInfoProps> = ({ countryName, countryData, cou
       
       if (!targetCountryCode) return;
 
+      // Switching countries fast can land an older response last, showing one
+      // country's capital/population under another country's name.
+      const isCurrent = beginCountryInfoRequest();
       setLoadingInfo(true);
       try {
         const info = await iso3166Service.getCountryInfo(targetCountryCode);
+        if (!isCurrent()) return;
         setCountryInfo(info);
       } catch (error) {
+        if (!isCurrent()) return;
         console.error('Error fetching country info:', error);
         setCountryInfo(null);
       } finally {
-        setLoadingInfo(false);
+        if (isCurrent()) setLoadingInfo(false);
       }
     };
 
     fetchCountryInfo();
-  }, [subdivisions, countryName, countryCode]);
+  }, [subdivisions, countryName, countryCode, beginCountryInfoRequest]);
 
   // Scroll to highlighted subdivision when it changes
   useEffect(() => {
@@ -1003,28 +1010,53 @@ const CountryInfo: React.FC<CountryInfoProps> = ({ countryName, countryData, cou
       const subdivisionElement = subdivisionRefs.current[highlightedSubdivision];
       if (subdivisionElement) {
         // Use a timeout to ensure the component has rendered
-        setTimeout(() => {
-          subdivisionElement.scrollIntoView({
+        const timer = setTimeout(() => {
+          scrollIntoViewIfSupported(subdivisionElement, {
             behavior: 'smooth',
             block: 'center',
             inline: 'nearest'
           });
         }, 300); // Delay to allow data loading and rendering
+        return () => clearTimeout(timer);
       }
     }
   }, [highlightedSubdivision, countryData]); // Also depend on countryData to ensure data is loaded
 
-  // Reset visible count and clear filter errors when country changes
+  // Which country the current filter/sort values belong to. Seeded from the URL
+  // so that adopting the country the link named does not clear the filters the
+  // same link carried — the reset must fire when the user picks a *different*
+  // country, not when the first country's data finishes loading.
+  const filtersCountryRef = useRef<string | null>(resolveCountry(readUrlState().country)?.code ?? null);
+
   useEffect(() => {
     setVisibleCount(VIRTUAL_PAGE);
-    setFilterText('');
-    setTypeFilter('all');
-    setSortOrder('code-asc');
     setFlagErrors(new Set());
     setScrollTop(0);
     naturalHeightRef.current = 0;
     if (contentRef.current) contentRef.current.scrollTop = 0;
-  }, [countryData]);
+
+    // No country selected yet (first render, before the URL is resolved) —
+    // there is nothing to reset, and resetting here would discard the values
+    // seeded from the URL before the country they belong to arrives.
+    const code = countryCode ? countryCode.toUpperCase() : null;
+    if (code === null || filtersCountryRef.current === code) return;
+
+    filtersCountryRef.current = code;
+    setFilterText('');
+    setTypeFilter('all');
+    setSortOrder('code-asc');
+  }, [countryData, countryCode]);
+
+  // Mirror filter/sort into the URL so the whole view is shareable, not just
+  // the country. mergeUrlState merges rather than replaces — InteractiveMap
+  // owns country/subdivision in the same query string.
+  useEffect(() => {
+    mergeUrlState({
+      filter: filterText.trim() || null,
+      type: typeFilter !== 'all' ? typeFilter : null,
+      sort: sortOrder !== 'code-asc' ? sortOrder : null,
+    });
+  }, [filterText, typeFilter, sortOrder]);
 
   // Reset visible count when filters change
   useEffect(() => {
@@ -1345,9 +1377,6 @@ const CountryInfo: React.FC<CountryInfoProps> = ({ countryName, countryData, cou
         ) : subdivisions.length === 0 ? (
           <ErrorMessage>
             No subdivision data available for {countryName}
-            <div style={{fontSize: '10px', color: '#999', marginTop: '4px'}}>
-              Debug: countryData has {Object.keys(countryData).length} keys but subdivisions array is empty
-            </div>
           </ErrorMessage>
         ) : (
           <>
@@ -1558,7 +1587,7 @@ const CountryInfo: React.FC<CountryInfoProps> = ({ countryName, countryData, cou
       {selectedSubdivisionModal && (
         <SubdivisionModal
           subdivision={selectedSubdivisionModal}
-          subdivisions={subdivisions}
+          subdivisions={filteredSubdivisions}
           currentIndex={currentSubdivisionIndex}
           countryCode={getCountryCode()}
           onClose={closeModal}

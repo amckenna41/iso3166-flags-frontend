@@ -1,7 +1,9 @@
 describe('Country Selection Workflow', () => {
   beforeEach(() => {
     // Stub subdivision and country-info API calls so tests run offline and deterministically
-    cy.intercept('GET', '**/iso3166-2-api**/alpha/DE', {
+    // Path-only patterns: the ISO 3166-2 base URL is the dev proxy (/api/iso3166-2)
+    // locally and the public API in production, and the code is lowercased.
+    cy.intercept('GET', '**/alpha/*', {
       statusCode: 200,
       body: {
         'DE-BE': { code: 'DE-BE', name: 'Berlin', type: 'State', latLng: [52.52, 13.405], flag: '' },
@@ -9,20 +11,28 @@ describe('Country Selection Workflow', () => {
       },
     }).as('getSubdivisions');
 
-    cy.intercept('GET', '**/restcountries.com**/alpha/DE', {
+    // Country info comes from the serverless proxy in the RestCountries v5 shape
+    cy.intercept('GET', '**/api/country-info*', {
       statusCode: 200,
-      body: [
-        {
-          name: { common: 'Germany', official: 'Federal Republic of Germany' },
-          cca2: 'DE', cca3: 'DEU', ccn3: '276',
-          region: 'Europe', subregion: 'Western Europe',
-          capital: ['Berlin'], area: 357114, population: 83240525,
-          timezones: ['UTC+01:00'],
-          currencies: { EUR: { name: 'Euro', symbol: '€' } },
-          languages: { deu: 'German' },
-          flags: { svg: '', png: '' },
+      body: {
+        data: {
+          objects: [
+            {
+              names: { common: 'Germany', official: 'Federal Republic of Germany' },
+              codes: { alpha_2: 'DE', alpha_3: 'DEU', ccn3: '276' },
+              region: 'Europe',
+              subregion: 'Western Europe',
+              capitals: [{ name: 'Berlin' }],
+              area: { kilometers: 357114 },
+              population: 83240525,
+              timezones: ['UTC+01:00'],
+              currencies: [{ code: 'EUR', name: 'Euro', symbol: '€' }],
+              languages: [{ iso639_1: 'de', name: 'German' }],
+              flag: { url_svg: '', url_png: '' },
+            },
+          ],
         },
-      ],
+      },
     }).as('getCountryInfo');
 
     cy.visit('/');

@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import styled, { keyframes } from 'styled-components';
 import { ChevronDown, MapPin, Loader } from 'lucide-react';
 import { iso3166Service, SubdivisionData } from '../services/iso3166Service';
+import { useLatestRequest } from '../utils/useLatestRequest';
+import { scrollIntoViewIfSupported } from '../utils/dom';
 
 const DropdownContainer = styled.div<{ $visible: boolean }>`
   position: absolute;
@@ -170,7 +172,7 @@ const DropdownList = styled.div`
   }
 `;
 
-const DropdownItem = styled.div`
+const DropdownItem = styled.div<{ $active?: boolean }>`
   padding: 12px 16px;
   cursor: pointer;
   transition: background-color 0.2s;
@@ -178,6 +180,7 @@ const DropdownItem = styled.div`
   display: flex;
   align-items: center;
   gap: 8px;
+  background: ${props => (props.$active ? 'rgba(102, 126, 234, 0.14)' : 'transparent')};
 
   &:hover {
     background: rgba(102, 126, 234, 0.1);
@@ -257,6 +260,9 @@ const SubdivisionDropdown: React.FC<SubdivisionDropdownProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [subdivisions, setSubdivisions] = useState<SubdivisionData[]>([]);
   const [loading, setLoading] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const listRef = useRef<HTMLDivElement>(null);
+  const beginRequest = useLatestRequest();
 
   // Load subdivisions when country changes
   useEffect(() => {
@@ -266,27 +272,33 @@ const SubdivisionDropdown: React.FC<SubdivisionDropdownProps> = ({
         return;
       }
 
+      // Switching countries quickly can land an older response last, showing
+      // one country's subdivisions under another country's name.
+      const isCurrent = beginRequest();
       setLoading(true);
       try {
         const countryData = await iso3166Service.getCountrySubdivisions(selectedCountryCode.toLowerCase());
+        if (!isCurrent()) return;
         const subdivisionList = Object.entries(countryData).map(([code, data]) => ({
           ...data,
           code: code
         })).sort((a, b) => a.code.localeCompare(b.code));
-        
+
         setSubdivisions(subdivisionList);
       } catch (error) {
+        if (!isCurrent()) return;
         console.error('Error loading subdivisions:', error);
         setSubdivisions([]);
       } finally {
-        setLoading(false);
+        if (isCurrent()) setLoading(false);
       }
     };
 
     loadSubdivisions();
     setIsOpen(false); // Close dropdown when country changes
     setSearchTerm(''); // Clear search term
-  }, [selectedCountryCode]);
+    setActiveIndex(-1);
+  }, [selectedCountryCode, beginRequest]);
 
   // Close dropdown when visibility changes
   useEffect(() => {
@@ -306,11 +318,13 @@ const SubdivisionDropdown: React.FC<SubdivisionDropdownProps> = ({
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
+    setActiveIndex(-1);
   };
 
   const handleSubdivisionClick = (subdivision: SubdivisionData) => {
     setIsOpen(false);
     setSearchTerm('');
+    setActiveIndex(-1);
     onSubdivisionSelect(subdivision.code, subdivision.name);
   };
 
@@ -320,6 +334,48 @@ const SubdivisionDropdown: React.FC<SubdivisionDropdownProps> = ({
     subdivision.type.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Keep the highlighted option scrolled into view during arrow-key navigation
+  useEffect(() => {
+    if (activeIndex < 0 || !listRef.current) return;
+    scrollIntoViewIfSupported(
+      listRef.current.querySelector(`[data-index="${activeIndex}"]`),
+      { block: 'nearest' }
+    );
+  }, [activeIndex]);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      setIsOpen(false);
+      setActiveIndex(-1);
+      return;
+    }
+    if (!isOpen) {
+      if (e.key === 'ArrowDown' || e.key === 'Enter') {
+        e.preventDefault();
+        if (selectedCountryCode && !loading && subdivisions.length > 0) setIsOpen(true);
+      }
+      return;
+    }
+    if (filteredSubdivisions.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActiveIndex(prev => (prev + 1) % filteredSubdivisions.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveIndex(prev => (prev <= 0 ? filteredSubdivisions.length - 1 : prev - 1));
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      setActiveIndex(0);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      setActiveIndex(filteredSubdivisions.length - 1);
+    } else if (e.key === 'Enter' && activeIndex >= 0) {
+      e.preventDefault();
+      handleSubdivisionClick(filteredSubdivisions[activeIndex]);
+    }
+  };
+
   const getPlaceholderText = () => {
     if (!selectedCountryCode) return 'Select a country first';
     if (loading) return 'Loading subdivisions...';
@@ -328,12 +384,13 @@ const SubdivisionDropdown: React.FC<SubdivisionDropdownProps> = ({
   };
 
   return (
-    <DropdownContainer $visible={visible}>
+    <DropdownContainer $visible={visible} onKeyDown={handleKeyDown}>
       <DropdownButton
         onClick={handleToggle}
         disabled={!selectedCountryCode || loading || subdivisions.length === 0}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
+        aria-controls="subdivision-dropdown-list"
       >
         <ButtonContent>
           <MapPin size={16} color="#666" />
@@ -369,17 +426,30 @@ const SubdivisionDropdown: React.FC<SubdivisionDropdownProps> = ({
               value={searchTerm}
               onChange={handleSearchChange}
               onClick={(e) => e.stopPropagation()}
+              aria-label="Search subdivisions"
+              aria-controls="subdivision-dropdown-list"
+              aria-activedescendant={
+                activeIndex >= 0 && filteredSubdivisions[activeIndex]
+                  ? `subdivision-option-${filteredSubdivisions[activeIndex].code}`
+                  : undefined
+              }
             />
-            <DropdownList>
+            <DropdownList ref={listRef} id="subdivision-dropdown-list" role="listbox">
               {loading ? (
                 <LoadingContainer>
                   <SpinningLoader size={16} />
                   Loading subdivisions...
                 </LoadingContainer>
               ) : filteredSubdivisions.length > 0 ? (
-                filteredSubdivisions.map((subdivision) => (
+                filteredSubdivisions.map((subdivision, index) => (
                   <DropdownItem
                     key={subdivision.code}
+                    id={`subdivision-option-${subdivision.code}`}
+                    role="option"
+                    data-index={index}
+                    aria-selected={index === activeIndex}
+                    $active={index === activeIndex}
+                    onMouseEnter={() => setActiveIndex(index)}
                     onClick={() => handleSubdivisionClick(subdivision)}
                   >
                     <SubdivisionCode>{subdivision.code}</SubdivisionCode>

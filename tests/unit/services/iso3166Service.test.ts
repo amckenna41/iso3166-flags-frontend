@@ -35,9 +35,18 @@ describe('iso3166Service', () => {
 
   describe('getSubdivisionFlagUrl', () => {
     it('should return a valid flag URL for a subdivision code', () => {
-      const url = iso3166Service.getSubdivisionFlagUrl('US', 'US-CA');
-      expect(url).toContain('US');
-      expect(url).toContain('ca');
+      // The flags repository stores these as <CC>/<CC>-<SUB>.svg, uppercase and
+      // unpadded. Lowercasing/zero-padding to .png produced URLs that 404.
+      expect(iso3166Service.getSubdivisionFlagUrl('US', 'US-CA')).toBe(
+        'https://raw.githubusercontent.com/amckenna41/iso3166-flags/main/iso3166-2-flags/US/US-CA.svg'
+      );
+    });
+
+    it('should not zero-pad single-character subdivision codes', () => {
+      // Regression: IE-C used to become IE-0c.png
+      expect(iso3166Service.getSubdivisionFlagUrl('IE', 'IE-C')).toBe(
+        'https://raw.githubusercontent.com/amckenna41/iso3166-flags/main/iso3166-2-flags/IE/IE-C.svg'
+      );
     });
 
     it('should return empty string when countryCode is null', () => {
@@ -152,6 +161,42 @@ describe('iso3166Service', () => {
       await iso3166Service.getCountryInfo('US');
       await iso3166Service.getCountryInfo('US');
 
+      expect(mockedAxios.get).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('in-flight request de-duplication', () => {
+    it('shares one request between callers that miss the cache in the same tick', async () => {
+      let resolveRequest: (value: unknown) => void = () => {};
+      mockedAxios.get.mockReturnValueOnce(new Promise(resolve => { resolveRequest = resolve; }) as any);
+
+      const first = iso3166Service.getCountrySubdivisions('FR');
+      const second = iso3166Service.getCountrySubdivisions('FR');
+
+      resolveRequest({ data: { 'FR-BRE': { code: 'FR-BRE', name: 'Bretagne', type: 'Region', latLng: [48, -3], flag: '' } } });
+
+      await expect(first).resolves.toEqual(await second);
+      expect(mockedAxios.get).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not wedge the key after a failure — a later call retries', async () => {
+      mockedAxios.get.mockRejectedValueOnce(new Error('Network error'));
+      await expect(iso3166Service.getCountrySubdivisions('IT')).rejects.toThrow('Network error');
+
+      mockedAxios.get.mockResolvedValueOnce({ data: {} });
+      await expect(iso3166Service.getCountrySubdivisions('IT')).resolves.toEqual({});
+      expect(mockedAxios.get).toHaveBeenCalledTimes(2);
+    });
+
+    it('de-duplicates searches as well', async () => {
+      let resolveRequest: (value: unknown) => void = () => {};
+      mockedAxios.get.mockReturnValueOnce(new Promise(resolve => { resolveRequest = resolve; }) as any);
+
+      const first = iso3166Service.searchSubdivisions('cork');
+      const second = iso3166Service.searchSubdivisions('cork');
+      resolveRequest({ data: {} });
+
+      await Promise.all([first, second]);
       expect(mockedAxios.get).toHaveBeenCalledTimes(1);
     });
   });

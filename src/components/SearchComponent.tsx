@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import styled from 'styled-components';
 import { Search, X, Loader } from 'lucide-react';
 import { iso3166Service, SearchResult } from '../services/iso3166Service';
+import { useLatestRequest } from '../utils/useLatestRequest';
 
 const SearchContainer = styled.div<{ $leftPosition: number }>`
   position: absolute;
@@ -97,11 +98,12 @@ const SearchResults = styled.div`
   z-index: 1001;
 `;
 
-const SearchResultItem = styled.div`
+const SearchResultItem = styled.div<{ $active?: boolean }>`
   padding: 12px 16px;
   border-bottom: 1px solid #f0f0f0;
   cursor: pointer;
   transition: background-color 0.2s;
+  background: ${props => (props.$active ? '#eef1fd' : 'transparent')};
 
   &:hover {
     background: #f8f9fa;
@@ -141,6 +143,10 @@ const SearchComponent: React.FC<SearchComponentProps> = ({ onResultSelect, subdi
   const [isLoading, setIsLoading] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [searchError, setSearchError] = useState(false);
+  // -1 means "no keyboard selection"; Enter then does nothing rather than
+  // firing the first result the user never looked at.
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const beginRequest = useLatestRequest();
 
   const searchSubdivisions = useCallback(async (searchTerm: string) => {
     if (!searchTerm.trim() || searchTerm.length < 2) {
@@ -149,67 +155,51 @@ const SearchComponent: React.FC<SearchComponentProps> = ({ onResultSelect, subdi
       return;
     }
 
+    // Responses can arrive out of order — a slow "cal" must not overwrite a
+    // fast "flor". Anything but the newest request is discarded.
+    const isCurrent = beginRequest();
     setIsLoading(true);
     setSearchError(false);
-    try {
+    // Resolve to a single result object, then commit once — keeps the staleness
+    // check to one place instead of every branch.
+    const resolve = async (): Promise<SearchResult> => {
       // Check if the search term looks like a subdivision code (e.g., KE-01, US-CA, KE-)
       const subdivisionCodePattern = /^[A-Z]{2}(-[A-Z0-9]*)?$/i;
-      
-      if (subdivisionCodePattern.test(searchTerm.toUpperCase())) {
-        // Handle subdivision code search
-        const upperSearchTerm = searchTerm.toUpperCase();
-        
-        if (upperSearchTerm.includes('-')) {
-          // Full or partial subdivision code (e.g., KE-01 or KE-)
-          const [countryCode, subdivisionCode] = upperSearchTerm.split('-');
-          
-          // Get the full country data
-          const countryData = await iso3166Service.getCountrySubdivisions(countryCode.toLowerCase());
-          
-          if (subdivisionCode) {
-            // Looking for specific subdivision (e.g., KE-01)
-            const fullSubdivisionCode = `${countryCode}-${subdivisionCode}`;
-            if (countryData[fullSubdivisionCode]) {
-              setResults({
-                [countryCode]: {
-                  [fullSubdivisionCode]: countryData[fullSubdivisionCode]
-                }
-              });
-            } else {
-              setResults({});
-            }
-          } else {
-            // Looking for all subdivisions in country (e.g., KE-)
-            if (Object.keys(countryData).length > 0) {
-              setResults({ [countryCode]: countryData });
-            } else {
-              setResults({});
-            }
-          }
-        } else {
-          // Just country code (e.g., KE) - show all subdivisions
-          const countryCode = upperSearchTerm;
-          const countryData = await iso3166Service.getCountrySubdivisions(countryCode.toLowerCase());
-          
-          if (Object.keys(countryData).length > 0) {
-            setResults({ [countryCode]: countryData });
-          } else {
-            setResults({});
-          }
-        }
-      } else {
+
+      if (!subdivisionCodePattern.test(searchTerm.toUpperCase())) {
         // Handle name-based search using the API
-        const searchResults = await iso3166Service.searchSubdivisions(searchTerm, 70);
-        setResults(searchResults);
+        return iso3166Service.searchSubdivisions(searchTerm, 70);
       }
+
+      const upperSearchTerm = searchTerm.toUpperCase();
+      const [countryCode, subdivisionCode] = upperSearchTerm.split('-');
+      const countryData = await iso3166Service.getCountrySubdivisions(countryCode.toLowerCase());
+
+      if (subdivisionCode) {
+        // Looking for a specific subdivision (e.g., KE-01)
+        const fullSubdivisionCode = `${countryCode}-${subdivisionCode}`;
+        return countryData[fullSubdivisionCode]
+          ? { [countryCode]: { [fullSubdivisionCode]: countryData[fullSubdivisionCode] } }
+          : {};
+      }
+
+      // Country code only, with or without a trailing dash (KE or KE-)
+      return Object.keys(countryData).length > 0 ? { [countryCode]: countryData } : {};
+    };
+
+    try {
+      const next = await resolve();
+      if (!isCurrent()) return;
+      setResults(next);
     } catch (error) {
+      if (!isCurrent()) return;
       console.error('Search error:', error);
       setResults({});
       setSearchError(true);
     } finally {
-      setIsLoading(false);
+      if (isCurrent()) setIsLoading(false);
     }
-  }, []);
+  }, [beginRequest]);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -223,6 +213,7 @@ const SearchComponent: React.FC<SearchComponentProps> = ({ onResultSelect, subdi
     const value = e.target.value;
     setQuery(value);
     setShowResults(true);
+    setActiveIndex(-1);
   };
 
   const handleClear = () => {
@@ -230,6 +221,7 @@ const SearchComponent: React.FC<SearchComponentProps> = ({ onResultSelect, subdi
     setResults({});
     setShowResults(false);
     setSearchError(false);
+    setActiveIndex(-1);
   };
 
   const handleResultClick = (countryCode: string, subdivisionName: string, subdivisionCode: string) => {
@@ -274,6 +266,28 @@ const SearchComponent: React.FC<SearchComponentProps> = ({ onResultSelect, subdi
 
   const displayResults = formatResultsForDisplay();
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Escape') {
+      setShowResults(false);
+      setActiveIndex(-1);
+      return;
+    }
+    if (!showResults || displayResults.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActiveIndex(prev => (prev + 1) % displayResults.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveIndex(prev => (prev <= 0 ? displayResults.length - 1 : prev - 1));
+    } else if (e.key === 'Enter' && activeIndex >= 0) {
+      e.preventDefault();
+      const result = displayResults[activeIndex];
+      handleResultClick(result.countryCode, result.subdivisionName, result.subdivisionCode);
+      setActiveIndex(-1);
+    }
+  };
+
   // Layout constants — must match the positioned overlay controls in InteractiveMap.
   const COUNTRY_DROPDOWN_LEFT_PX = 80;
   const DROPDOWN_WIDTH_PX = 280;
@@ -297,10 +311,17 @@ const SearchComponent: React.FC<SearchComponentProps> = ({ onResultSelect, subdi
           onChange={handleInputChange}
           onFocus={handleInputFocus}
           onBlur={handleInputBlur}
+          onKeyDown={handleKeyDown}
+          role="combobox"
           aria-label="Search subdivisions"
           aria-autocomplete="list"
           aria-expanded={showResults && query.length >= 2}
           aria-controls="search-results-list"
+          aria-activedescendant={
+            activeIndex >= 0 && displayResults[activeIndex]
+              ? `search-result-${displayResults[activeIndex].countryCode}-${displayResults[activeIndex].subdivisionCode}`
+              : undefined
+          }
         />
         {isLoading ? (
           <LoadingIcon>
@@ -316,9 +337,14 @@ const SearchComponent: React.FC<SearchComponentProps> = ({ onResultSelect, subdi
       {showResults && query.length >= 2 && (
         <SearchResults id="search-results-list" role="listbox">
           {displayResults.length > 0 ? (
-            displayResults.map((result) => (
-              <SearchResultItem                role="option"
-                aria-selected={false}                key={`${result.countryCode}-${result.subdivisionCode}`}
+            displayResults.map((result, index) => (
+              <SearchResultItem
+                role="option"
+                id={`search-result-${result.countryCode}-${result.subdivisionCode}`}
+                aria-selected={index === activeIndex}
+                $active={index === activeIndex}
+                key={`${result.countryCode}-${result.subdivisionCode}`}
+                onMouseEnter={() => setActiveIndex(index)}
                 onClick={() => handleResultClick(result.countryCode, result.subdivisionName, result.subdivisionCode)}
               >
                 <ResultTitle>{result.subdivisionName}</ResultTitle>

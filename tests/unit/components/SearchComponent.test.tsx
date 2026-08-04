@@ -40,13 +40,13 @@ describe('SearchComponent', () => {
 
   it('renders search input field', () => {
     render(<SearchComponent onResultSelect={mockOnResultSelect} />);
-    expect(screen.getByRole('textbox')).toBeInTheDocument();
+    expect(screen.getByRole('combobox')).toBeInTheDocument();
   });
 
   it('allows typing in search field', () => {
     render(<SearchComponent onResultSelect={mockOnResultSelect} />);
 
-    const searchInput = screen.getByRole('textbox') as HTMLInputElement;
+    const searchInput = screen.getByRole('combobox') as HTMLInputElement;
     userEvent.type(searchInput, 'United States');
 
     expect(searchInput.value).toBe('United States');
@@ -57,7 +57,7 @@ describe('SearchComponent', () => {
     render(<SearchComponent onResultSelect={mockOnResultSelect} />);
 
     // 'united' is >2 chars and does not match the 2-char country-code pattern
-    userEvent.type(screen.getByRole('textbox'), 'united');
+    userEvent.type(screen.getByRole('combobox'), 'united');
 
     await waitFor(() => {
       expect(screen.getByText('California')).toBeInTheDocument();
@@ -67,7 +67,7 @@ describe('SearchComponent', () => {
   it('clears search input on clear button click', () => {
     render(<SearchComponent onResultSelect={mockOnResultSelect} />);
 
-    const searchInput = screen.getByRole('textbox') as HTMLInputElement;
+    const searchInput = screen.getByRole('combobox') as HTMLInputElement;
     userEvent.type(searchInput, 'united');
     expect(searchInput.value).not.toBe('');
 
@@ -83,7 +83,7 @@ describe('SearchComponent', () => {
     render(<SearchComponent onResultSelect={mockOnResultSelect} />);
 
     // 'california' is longer than 2 chars, does not match the country-code pattern
-    userEvent.type(screen.getByRole('textbox'), 'california');
+    userEvent.type(screen.getByRole('combobox'), 'california');
 
     await waitFor(() => {
       expect(screen.getByText('California')).toBeInTheDocument();
@@ -95,7 +95,7 @@ describe('SearchComponent', () => {
     mockSearchSubdivisions.mockResolvedValue(MOCK_SEARCH_RESULTS);
     render(<SearchComponent onResultSelect={mockOnResultSelect} />);
 
-    userEvent.type(screen.getByRole('textbox'), 'cali');
+    userEvent.type(screen.getByRole('combobox'), 'cali');
 
     await waitFor(() => expect(screen.getByText('California')).toBeInTheDocument());
     userEvent.click(screen.getByText('California'));
@@ -119,7 +119,7 @@ describe('SearchComponent', () => {
     render(<SearchComponent onResultSelect={mockOnResultSelect} />);
 
     // 'region' is a multi-char name search (not a 2-char country code)
-    userEvent.type(screen.getByRole('textbox'), 'region');
+    userEvent.type(screen.getByRole('combobox'), 'region');
 
     await waitFor(() => {
       const items = screen.getAllByText(/Region \d+/);
@@ -131,7 +131,7 @@ describe('SearchComponent', () => {
     mockSearchSubdivisions.mockResolvedValue({});
     render(<SearchComponent onResultSelect={mockOnResultSelect} />);
 
-    userEvent.type(screen.getByRole('textbox'), 'zzzzz');
+    userEvent.type(screen.getByRole('combobox'), 'zzzzz');
 
     await waitFor(() => {
       expect(screen.getByText(/no subdivisions found/i)).toBeInTheDocument();
@@ -141,7 +141,7 @@ describe('SearchComponent', () => {
   it('handles empty search clearing results', () => {
     render(<SearchComponent onResultSelect={mockOnResultSelect} />);
 
-    const searchInput = screen.getByRole('textbox') as HTMLInputElement;
+    const searchInput = screen.getByRole('combobox') as HTMLInputElement;
     userEvent.type(searchInput, 'test');
     userEvent.clear(searchInput);
 
@@ -150,6 +150,6 @@ describe('SearchComponent', () => {
 
   it('renders with correct input type attribute', () => {
     render(<SearchComponent onResultSelect={mockOnResultSelect} />);
-    expect(screen.getByRole('textbox')).toHaveAttribute('type', 'text');
+    expect(screen.getByRole('combobox')).toHaveAttribute('type', 'text');
   });
 });

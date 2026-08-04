@@ -13,6 +13,32 @@ Visit the ISO 3166 Flags Explorer here:
 - **Rich Subdivision Data**: Access comprehensive information about over 5,000 administrative subdivisions including flags, local names, precise coordinates, parent codes, and historical change records from the ISO 3166-2 standard.
 - **Comprehensive Flags**: Browse thousands of official flags for countries and their subdivisions sourced from the [ISO 3166 Flags Dataset](https://github.com/amckenna41/iso3166-flags).
 - **Historical Updates**: Access historical information about changes to subdivision codes and naming conventions from the [ISO 3166 Updates Dataset](https://github.com/iso3166-updates).
+- **Country Comparison**: Compare up to four countries side by side — codes, capital, region, population, area, currencies, languages, timezones and TLDs — and export the comparison to CSV or JSON.
+- **Search Anywhere**: Search subdivisions by name or code across every country, and find countries by name, alpha-2 or alpha-3 code ("Ireland", "IE", "IRL").
+- **Favourites & Recents**: Starred and recently viewed countries are kept in the browser and surface at the top of the country dropdown.
+- **Shareable Links**: The country, subdivision, filter, type and sort are all mirrored into the URL, so a link reproduces the exact view you were looking at.
+- **Works Offline**: A service worker precaches the app shell and caches flags and subdivision data, so revisits load instantly and previously viewed countries keep working without a network.
+- **Keyboard & Screen Reader Friendly**: Every dropdown, menu and modal is operable from the keyboard with ARIA roles and states.
+
+## Shareable links
+
+| Parameter | Accepts | Example |
+|---|---|---|
+| `country` | alpha-2, alpha-3 or country name | `?country=IE` · `?country=IRL` · `?country=Ireland` |
+| `subdivision` | ISO 3166-2 code belonging to `country` | `?country=GB&subdivision=GB-ENG` |
+| `filter` | free text matched against subdivision name/code | `?country=IE&filter=cork` |
+| `type` | subdivision type as listed in the type filter | `?country=IE&type=County` |
+| `sort` | `code-asc`, `name-asc`, `name-desc` | `?country=IE&sort=name-asc` |
+
+Anything unrecognised is ignored rather than applied.
+
+## Testing
+
+```bash
+npm test          # Jest unit tests (jest.config.js)
+npm run test:ci   # ...with coverage, non-watch
+npm run cypress:run   # Cypress E2E suite
+```
 
 ## Data sources
 

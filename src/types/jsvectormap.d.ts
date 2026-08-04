@@ -13,6 +13,19 @@ declare module 'jsvectormap' {
     selected?: RegionStyle;
   }
 
+  interface MarkerStyle {
+    fill?: string;
+    stroke?: string;
+    strokeWidth?: number;
+    r?: number;
+  }
+
+  interface MarkerConfig {
+    name?: string;
+    coords: [number, number];
+    style?: MarkerStyle;
+  }
+
   interface JsVectorMapConfig {
     selector: HTMLElement;
     map: string;
@@ -25,9 +38,13 @@ declare module 'jsvectormap' {
     regionStyle?: RegionStyleConfig;
     regionsSelectable?: boolean;
     regionsSelectableOne?: boolean;
+    markers?: MarkerConfig[];
+    markerStyle?: { initial?: MarkerStyle; hover?: MarkerStyle; selected?: MarkerStyle };
     onRegionClick?: (event: any, code: string) => void;
     onRegionTooltipShow?: (event: any, tooltip: any, code: string) => void;
     onRegionOut?: () => void;
+    onMarkerClick?: (event: any, index: string) => void;
+    onMarkerTooltipShow?: (event: any, tooltip: any, index: string) => void;
   }
 
   interface JsVectorMapInstance {
@@ -39,6 +56,9 @@ declare module 'jsvectormap' {
     constructor(config: JsVectorMapConfig);
     regions?: any;
     destroy(): void;
+    addMarkers(config: MarkerConfig | MarkerConfig[]): void;
+    removeMarkers(markers?: string[]): void;
+    setFocus(config: { region?: string; animate?: boolean }): void;
   }
 
   export = jsVectorMap;

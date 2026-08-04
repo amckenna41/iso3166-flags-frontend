@@ -68,33 +68,38 @@ const DropdownMenu = styled.div<{ $isOpen: boolean }>`
   z-index: 1100;
 `;
 
+/* Wraps a trigger and its submenu. The submenu must be a sibling of the
+   trigger button, never a child — a button inside a button is invalid HTML and
+   swallows clicks and keyboard events. */
+const MenuGroup = styled.div`
+  position: relative;
+`;
+
 /* Top-level item — acts as a submenu trigger */
-const TopLevelItem = styled.button<{ $disabled?: boolean }>`
+const TopLevelItem = styled.button`
   position: relative;
   width: 100%;
   padding: 12px 16px;
   border: none;
   background: transparent;
-  color: ${props => (props.$disabled ? '#999999' : '#333333')};
+  color: #333333;
   text-align: left;
-  cursor: ${props => (props.$disabled ? 'not-allowed' : 'pointer')};
+  cursor: pointer;
   font-size: 14px;
-  opacity: ${props => (props.$disabled ? 0.6 : 1)};
   display: flex;
   align-items: center;
   gap: 8px;
   transition: background-color 0.15s;
 
-  &:hover:not(:disabled) {
+  &:hover:not(:disabled),
+  &:focus-visible:not(:disabled) {
     background: #f5f5f5;
   }
 
-  &:first-child {
-    border-radius: 8px 8px 0 0;
-  }
-
-  &:last-child {
-    border-radius: 0 0 8px 8px;
+  &:disabled {
+    color: #999999;
+    cursor: not-allowed;
+    opacity: 0.6;
   }
 
   svg {
@@ -181,8 +186,18 @@ const ExportButton: React.FC<ExportButtonProps> = ({ country, subdivisions, coun
         setActiveSubmenu(null);
       }
     };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsOpen(false);
+        setActiveSubmenu(null);
+      }
+    };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
   }, []);
 
   const close = () => { setIsOpen(false); setActiveSubmenu(null); };
@@ -227,68 +242,91 @@ const ExportButton: React.FC<ExportButtonProps> = ({ country, subdivisions, coun
   return (
     <ExportContainer ref={menuRef}>
       <ExportButtonStyled
+        type="button"
         onClick={() => { setIsOpen(!isOpen); setActiveSubmenu(null); }}
         title="Export data"
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
       >
         <Download size={18} />
         <span>Export</span>
         <ChevronDown size={16} style={{ opacity: 0.7 }} />
       </ExportButtonStyled>
 
-      <DropdownMenu $isOpen={isOpen}>
+      <DropdownMenu $isOpen={isOpen} role="menu">
         {/* Export Country Details → submenu */}
-        <TopLevelItem
-          disabled={!hasCountry}
-          title={hasCountry ? 'Export country details' : 'Select a country first'}
+        <MenuGroup
           onMouseEnter={() => hasCountry && setActiveSubmenu('country')}
           onMouseLeave={() => setActiveSubmenu(null)}
         >
-          <Download size={16} />
-          Export Country Details
-          <ChevronLeft size={14} className="chevron" />
+          <TopLevelItem
+            type="button"
+            role="menuitem"
+            disabled={!hasCountry}
+            aria-haspopup="menu"
+            aria-expanded={activeSubmenu === 'country'}
+            title={hasCountry ? 'Export country details' : 'Select a country first'}
+            // Click and Enter/Space open the submenu too, so it is reachable
+            // without a mouse — it used to be hover-only.
+            onClick={() => hasCountry && setActiveSubmenu(prev => (prev === 'country' ? null : 'country'))}
+            onFocus={() => hasCountry && setActiveSubmenu('country')}
+          >
+            <Download size={16} />
+            Export Country Details
+            <ChevronLeft size={14} className="chevron" />
+          </TopLevelItem>
 
           {activeSubmenu === 'country' && (
-            <SubMenu onMouseEnter={() => setActiveSubmenu('country')} onMouseLeave={() => setActiveSubmenu(null)}>
-              <SubMenuItem onClick={handleExportCountryCSV}>
+            <SubMenu role="menu" aria-label="Export country details">
+              <SubMenuItem type="button" role="menuitem" onClick={handleExportCountryCSV}>
                 <FileText size={15} />
                 Export to CSV
               </SubMenuItem>
               <Divider />
-              <SubMenuItem onClick={handleExportCountryJSON}>
+              <SubMenuItem type="button" role="menuitem" onClick={handleExportCountryJSON}>
                 <FileJson size={15} />
                 Export to JSON
               </SubMenuItem>
             </SubMenu>
           )}
-        </TopLevelItem>
+        </MenuGroup>
 
         <Divider />
 
         {/* Export Subdivisions → submenu */}
-        <TopLevelItem
-          disabled={!hasSubdivisions}
-          title={hasSubdivisions ? 'Export subdivisions' : 'Load a country first'}
+        <MenuGroup
           onMouseEnter={() => hasSubdivisions && setActiveSubmenu('subdivisions')}
           onMouseLeave={() => setActiveSubmenu(null)}
         >
-          <Download size={16} />
-          Export Subdivisions ({subdivisions.length})
-          <ChevronLeft size={14} className="chevron" />
+          <TopLevelItem
+            type="button"
+            role="menuitem"
+            disabled={!hasSubdivisions}
+            aria-haspopup="menu"
+            aria-expanded={activeSubmenu === 'subdivisions'}
+            title={hasSubdivisions ? 'Export subdivisions' : 'Load a country first'}
+            onClick={() => hasSubdivisions && setActiveSubmenu(prev => (prev === 'subdivisions' ? null : 'subdivisions'))}
+            onFocus={() => hasSubdivisions && setActiveSubmenu('subdivisions')}
+          >
+            <Download size={16} />
+            Export Subdivisions ({subdivisions.length})
+            <ChevronLeft size={14} className="chevron" />
+          </TopLevelItem>
 
           {activeSubmenu === 'subdivisions' && (
-            <SubMenu onMouseEnter={() => setActiveSubmenu('subdivisions')} onMouseLeave={() => setActiveSubmenu(null)}>
-              <SubMenuItem onClick={handleExportSubdivisionsCSV}>
+            <SubMenu role="menu" aria-label="Export subdivisions">
+              <SubMenuItem type="button" role="menuitem" onClick={handleExportSubdivisionsCSV}>
                 <FileText size={15} />
                 Export to CSV
               </SubMenuItem>
               <Divider />
-              <SubMenuItem onClick={handleExportSubdivisionsJSON}>
+              <SubMenuItem type="button" role="menuitem" onClick={handleExportSubdivisionsJSON}>
                 <FileJson size={15} />
                 Export to JSON
               </SubMenuItem>
             </SubMenu>
           )}
-        </TopLevelItem>
+        </MenuGroup>
       </DropdownMenu>
     </ExportContainer>
   );

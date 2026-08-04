@@ -4,8 +4,11 @@ module.exports = async function handler(req, res) {
   const { code } = req.query;
   const apiKey = process.env.REST_COUNTRIES_API_KEY;
 
-  if (!code || typeof code !== 'string') {
-    return res.status(400).json({ error: 'code query parameter is required' });
+  // Strict shape check — this endpoint fronts a metered, keyed upstream API, so
+  // anything that is not an ISO 3166-1 alpha-2 code is rejected before we spend
+  // a request on it. Note req.query values can be arrays (?code=a&code=b).
+  if (typeof code !== 'string' || !/^[A-Za-z]{2}$/.test(code)) {
+    return res.status(400).json({ error: 'code must be a 2-letter ISO 3166-1 alpha-2 country code' });
   }
 
   if (!apiKey) {
@@ -20,7 +23,13 @@ module.exports = async function handler(req, res) {
     });
 
     if (!response.ok) {
-      return res.status(response.status).json({ error: `Upstream error: ${response.status}` });
+      // Do not forward upstream auth failures — a 401/403 here advertises that
+      // our key is missing or revoked. Collapse everything except 404 to 502.
+      console.error(`Upstream REST Countries error for ${code}: ${response.status}`);
+      if (response.status === 404) {
+        return res.status(404).json({ error: 'Country not found' });
+      }
+      return res.status(502).json({ error: 'Upstream data source unavailable' });
     }
 
     const data = await response.json();

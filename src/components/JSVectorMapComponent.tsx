@@ -46,6 +46,18 @@ const MapContainer = styled.div`
     display: none !important;
   }
 
+  /* Selected-region styling.
+     jsvectormap re-applies its own fill/stroke inline on every hover and mouse
+     out, so selection used to be repainted by a 100ms polling interval. A CSS
+     rule marked !important outranks those inline styles, so the component only
+     has to toggle the data-selected attribute and the browser keeps it correct. */
+  [data-selected='true'] {
+    fill: #60a5fa !important;
+    fill-opacity: 0.9 !important;
+    stroke: #3b82f6 !important;
+    stroke-width: 1.5 !important;
+  }
+
   /* Style default zoom buttons with individual positioning */
   .jvm-zoom-buttons {
     position: relative !important;
@@ -98,10 +110,11 @@ const MapContainer = styled.div`
   }
 `;
 
-const CustomTooltip = styled.div<{ $visible: boolean; $x: number; $y: number }>`
+// x/y deliberately live in an inline style, not in this template. Interpolating
+// cursor coordinates into styled-components CSS injects a brand new class and
+// stylesheet rule for every pixel of mouse movement.
+const CustomTooltip = styled.div<{ $visible: boolean }>`
   position: absolute;
-  left: ${props => Math.max(10, Math.min(props.$x, window.innerWidth - 200))}px;
-  top: ${props => Math.max(10, props.$y - 10)}px;
   background: rgba(0, 0, 0, 0.9);
   color: white;
   padding: 12px 16px;
@@ -144,6 +157,14 @@ interface JSVectorMapProps {
   selectedCountry?: string;
   hoveredCountry?: string;
 }
+
+/** Only sets/clears the attribute — the CSS rule does the painting. */
+const setRegionSelected = (region: any, selected: boolean): void => {
+  const element = region?.element?.node;
+  if (!element) return;
+  if (selected) element.setAttribute('data-selected', 'true');
+  else element.removeAttribute('data-selected');
+};
 
 const JSVectorMapComponent: React.FC<JSVectorMapProps> = ({
   onCountryClick,
@@ -245,40 +266,14 @@ const JSVectorMapComponent: React.FC<JSVectorMapProps> = ({
           const countryCode = code.toLowerCase();
 
           currentlySelectedRef.current = countryCode;
-          
-          // Immediately apply styling to clicked region
+
           const regions = mapInstance.current?.regions;
           if (regions) {
-            // Reset all regions first
-            Object.keys(regions).forEach(regionCode => {
-              const region = regions[regionCode];
-              if (region && region.element && region.element.node) {
-                const element = region.element.node;
-                element.setAttribute('fill', '#e2e8f0');
-                element.setAttribute('fill-opacity', '0.8');
-                element.setAttribute('stroke', '#cbd5e1');
-                element.setAttribute('stroke-width', '0.5');
-                element.removeAttribute('data-selected');
-              }
-            });
-            
-            // Apply styling to clicked region
-            const selectedRegion = regions[countryCode];
-            if (selectedRegion && selectedRegion.element && selectedRegion.element.node) {
-              const element = selectedRegion.element.node;
-              // Set both attributes AND direct style properties for maximum persistence
-              element.setAttribute('fill', '#60a5fa');
-              element.setAttribute('fill-opacity', '0.9');
-              element.setAttribute('stroke', '#3b82f6');
-              element.setAttribute('stroke-width', '1.5');
-              element.setAttribute('data-selected', 'true');
-              element.style.fill = '#60a5fa';
-              element.style.fillOpacity = '0.9';
-              element.style.stroke = '#3b82f6';
-              element.style.strokeWidth = '1.5';
-            }
+            Object.keys(regions).forEach(regionCode =>
+              setRegionSelected(regions[regionCode], regionCode === countryCode)
+            );
           }
-          
+
           if (onCountryClick) {
             onCountryClick(code.toUpperCase(), countryName);
           }
@@ -290,28 +285,6 @@ const JSVectorMapComponent: React.FC<JSVectorMapProps> = ({
           // Hide the default tooltip
           if (tooltip && tooltip.element) {
             tooltip.element.style.display = 'none';
-          }
-
-          // Prevent hover from overriding the selected region's styling
-          const selected = currentlySelectedRef.current;
-
-          if (selected) {
-            const regions = mapInstance.current?.regions;
-            if (regions) {
-              const selectedRegion = regions[selected];
-              if (selectedRegion && selectedRegion.element && selectedRegion.element.node) {
-                const element = selectedRegion.element.node;
-                element.setAttribute('fill', '#60a5fa');
-                element.setAttribute('fill-opacity', '0.9');
-                element.setAttribute('stroke', '#3b82f6');
-                element.setAttribute('stroke-width', '1.5');
-                element.setAttribute('data-selected', 'true');
-                element.style.fill = '#60a5fa';
-                element.style.fillOpacity = '0.9';
-                element.style.stroke = '#3b82f6';
-                element.style.strokeWidth = '1.5';
-              }
-            }
           }
 
           // Show structured tooltip at the current tracked mouse position
@@ -331,29 +304,6 @@ const JSVectorMapComponent: React.FC<JSVectorMapProps> = ({
         },
         onRegionOut: () => {
           setCustomTooltip({ visible: false, countryName: '', countryCode: '', flagUrl: '', x: 0, y: 0 });
-
-          // Restore selected region styling after hover resets it
-          setTimeout(() => {
-            const selected = currentlySelectedRef.current;
-            if (selected && mapInstance.current?.regions) {
-              const regions = mapInstance.current.regions;
-              const selectedRegion = regions[selected];
-              if (selectedRegion && selectedRegion.element && selectedRegion.element.node) {
-                const element = selectedRegion.element.node;
-                if (element.getAttribute('data-selected') === 'true') {
-                  element.setAttribute('fill', '#60a5fa');
-                  element.setAttribute('fill-opacity', '0.9');
-                  element.setAttribute('stroke', '#3b82f6');
-                  element.setAttribute('stroke-width', '1.5');
-                  element.style.fill = '#60a5fa';
-                  element.style.fillOpacity = '0.9';
-                  element.style.stroke = '#3b82f6';
-                  element.style.strokeWidth = '1.5';
-                }
-              }
-            }
-          }, 10);
-
           if (onCountryLeave) {
             onCountryLeave();
           }
@@ -391,47 +341,17 @@ const JSVectorMapComponent: React.FC<JSVectorMapProps> = ({
     const timeoutId = setTimeout(() => {
       try {
         const regions = mapInstance.current.regions;
+        const countryCode = selectedCountry ? selectedCountry.toLowerCase() : null;
 
-        // Reset all regions to initial state
-        Object.keys(regions).forEach(regionCode => {
-          const region = regions[regionCode];
-          if (region && region.element && region.element.node) {
-            const element = region.element.node;
-            element.setAttribute('fill', '#e2e8f0');
-            element.setAttribute('fill-opacity', '0.8');
-            element.setAttribute('stroke', '#cbd5e1');
-            element.setAttribute('stroke-width', '0.5');
-            element.removeAttribute('data-selected');
-            element.style.fill = '#e2e8f0';
-            element.style.fillOpacity = '0.8';
-            element.style.stroke = '#cbd5e1';
-            element.style.strokeWidth = '0.5';
-          }
-        });
+        Object.keys(regions).forEach(regionCode =>
+          setRegionSelected(regions[regionCode], regionCode === countryCode)
+        );
 
-        // Apply selected styling to the selected country
-        if (selectedCountry) {
-          const countryCode = selectedCountry.toLowerCase();
-          const selectedRegion = regions[countryCode];
-          if (selectedRegion && selectedRegion.element && selectedRegion.element.node) {
-            const element = selectedRegion.element.node;
-            element.setAttribute('fill', '#60a5fa');
-            element.setAttribute('fill-opacity', '0.9');
-            element.setAttribute('stroke', '#3b82f6');
-            element.setAttribute('stroke-width', '1.5');
-            element.setAttribute('data-selected', 'true');
-            element.style.fill = '#60a5fa';
-            element.style.fillOpacity = '0.9';
-            element.style.stroke = '#3b82f6';
-            element.style.strokeWidth = '1.5';
-            currentlySelectedRef.current = countryCode;
-          } else {
-            currentlySelectedRef.current = null;
-          }
-
+        if (countryCode) {
+          currentlySelectedRef.current = regions[countryCode] ? countryCode : null;
           // Zoom map to the selected country
           try {
-            mapInstance.current.setFocus({ region: selectedCountry.toLowerCase(), animate: true });
+            mapInstance.current.setFocus({ region: countryCode, animate: true });
           } catch (_) {
             // setFocus unavailable or region not in map data — no-op
           }
@@ -450,43 +370,16 @@ const JSVectorMapComponent: React.FC<JSVectorMapProps> = ({
     return () => clearTimeout(timeoutId);
   }, [selectedCountry]);
 
-  // Maintain selection styling continuously to prevent hover from overriding
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const selected = currentlySelectedRef.current;
-      if (selected && mapInstance.current?.regions) {
-        const regions = mapInstance.current.regions;
-        const selectedRegion = regions[selected];
-        if (selectedRegion && selectedRegion.element && selectedRegion.element.node) {
-          const element = selectedRegion.element.node;
-          // Always ensure selected region has proper styling
-          const currentFill = element.getAttribute('fill');
-          const currentStroke = element.getAttribute('stroke');
-          const currentStrokeWidth = element.getAttribute('stroke-width');
-          
-          if (currentFill !== '#60a5fa' || currentStroke !== '#3b82f6' || currentStrokeWidth !== '1.5') {
-            // Set both attributes AND style properties
-            element.setAttribute('fill', '#60a5fa');
-            element.setAttribute('fill-opacity', '0.9');
-            element.setAttribute('stroke', '#3b82f6');
-            element.setAttribute('stroke-width', '1.5');
-            element.setAttribute('data-selected', 'true');
-            element.style.fill = '#60a5fa';
-            element.style.fillOpacity = '0.9';
-            element.style.stroke = '#3b82f6';
-            element.style.strokeWidth = '1.5';
-          }
-        }
-      }
-    }, 100); // 100ms is sufficient to detect and correct hover overrides
-
-    return () => clearInterval(interval);
-  }, []); // Run continuously, not dependent on currentlySelected
-
   return (
     <MapContainer ref={mapRef}>
       {/* Render tooltip as structured JSX — avoids dangerouslySetInnerHTML XSS risk */}
-      <CustomTooltip $visible={customTooltip.visible} $x={customTooltip.x} $y={customTooltip.y}>
+      <CustomTooltip
+        $visible={customTooltip.visible}
+        style={{
+          left: `${Math.max(10, Math.min(customTooltip.x, window.innerWidth - 200))}px`,
+          top: `${Math.max(10, customTooltip.y - 10)}px`,
+        }}
+      >
         {customTooltip.visible && (
           <>
             <img

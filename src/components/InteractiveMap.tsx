@@ -9,7 +9,12 @@ import SearchComponent from './SearchComponent';
 import CountryDropdown from './CountryDropdown';
 import SubdivisionDropdown from './SubdivisionDropdown';
 import JSVectorMapComponent from './JSVectorMapComponent';
+import ErrorBoundary from './ErrorBoundary';
+import CountryComparison from './CountryComparison';
 import APP_CONFIG from '../config/appConfig';
+import { resolveCountry } from '../data/countries';
+import { mergeUrlState, isValidSubdivisionCode } from '../utils/urlState';
+import { useLatestRequest } from '../utils/useLatestRequest';
 
 /** Height of the fixed AppHeader. Must match AppHeader's min-height. */
 const HEADER_HEIGHT = 62;
@@ -29,8 +34,6 @@ const MapWrapper = styled.div`
   height: 100vh;
   width: 100%;
 `;
-
-MapWrapper.defaultProps = { 'data-testid': 'interactive-map' } as any;
 
 const MapSection = styled.div`
   flex: 1;
@@ -286,23 +289,22 @@ const InteractiveMap: React.FC<InteractiveMapProps> = () => {
   const [isErrorRetryable, setIsErrorRetryable] = useState(false);
   const [lastRetryAction, setLastRetryAction] = useState<(() => Promise<void>) | null>(null);
   const [infoPanelCollapsed, setInfoPanelCollapsed] = useState(false);
+  const [comparisonOpen, setComparisonOpen] = useState(false);
 
   // Tracks whether the URL has been parsed on initial mount
   const urlInitialized = useRef(false);
+  const beginCountryRequest = useLatestRequest();
 
   // Sync selected country and subdivision to the URL query string.
-  // Skip on first render so the URL restore effect can read the initial URL params first.
+  // mergeUrlState rather than a fresh URLSearchParams: CountryInfo owns the
+  // filter/type/sort keys in the same query string and must not be clobbered.
+  // Skipped on first render so the restore effect reads the initial URL first.
   useEffect(() => {
     if (!urlInitialized.current) return;
-    const params = new URLSearchParams();
-    if (selectedCountry) params.set('country', selectedCountry.toUpperCase());
-    if (highlightedSubdivision) params.set('subdivision', highlightedSubdivision);
-    const search = params.toString();
-    window.history.replaceState(
-      null,
-      '',
-      search ? `?${search}` : window.location.pathname
-    );
+    mergeUrlState({
+      country: selectedCountry ? selectedCountry.toUpperCase() : null,
+      subdivision: highlightedSubdivision,
+    });
   }, [selectedCountry, highlightedSubdivision]);
 
   const handleCountryClick = useCallback(async (countryCode: string, countryName: string) => {
@@ -321,7 +323,10 @@ const InteractiveMap: React.FC<InteractiveMapProps> = () => {
       await handleCountryClick(countryCode, countryName);
     };
     setLastRetryAction(() => retryFn);
-    
+
+    // Clicking through countries quickly can land an older response last,
+    // showing one country's subdivisions under another country's name.
+    const isCurrent = beginCountryRequest();
     try {
       setLoading(true);
       setError(null);
@@ -331,18 +336,20 @@ const InteractiveMap: React.FC<InteractiveMapProps> = () => {
       setHighlightedSubdivision(null); // Clear subdivision highlight when directly clicking country
       setSelectedCountryData(null); // Clear previous data immediately
       setInfoPanelCollapsed(false); // Auto-expand panel when country is selected
-      
+
       const subdivisionData = await iso3166Service.getCountrySubdivisions(countryCode.toLowerCase());
+      if (!isCurrent()) return;
       setSelectedCountryData(subdivisionData);
     } catch (err) {
+      if (!isCurrent()) return;
       console.error('Error loading country data:', err);
       const { message, isRetryable } = getErrorMessage(err);
       setError(message);
       setIsErrorRetryable(isRetryable);
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
-  }, []);
+  }, [beginCountryRequest]);
 
   const handleCountryHover = useCallback((countryCode: string, _countryName: string) => {
     setHoveredCountry(countryCode);
@@ -368,7 +375,8 @@ const InteractiveMap: React.FC<InteractiveMapProps> = () => {
         await handleSubdivisionSelect(subdivisionCode, _subdivisionName);
       };
       setLastRetryAction(() => retryFn);
-      
+
+      const isCurrent = beginCountryRequest();
       try {
         setLoading(true);
         setError(null);
@@ -376,19 +384,21 @@ const InteractiveMap: React.FC<InteractiveMapProps> = () => {
         setSelectedCountry(countryCode);
         setSelectedCountryName(countryName);
         setHighlightedSubdivision(subdivisionCode);
-        
+
         const subdivisionData = await iso3166Service.getCountrySubdivisions(countryCode.toLowerCase());
+        if (!isCurrent()) return;
         setSelectedCountryData(subdivisionData);
       } catch (err) {
+        if (!isCurrent()) return;
         console.error('Error loading subdivision data:', err);
         const { message, isRetryable } = getErrorMessage(err);
         setError(message);
         setIsErrorRetryable(isRetryable);
       } finally {
-        setLoading(false);
+        if (isCurrent()) setLoading(false);
       }
     }
-  }, [selectedCountryData, selectedCountryName]);
+  }, [selectedCountryData, selectedCountryName, beginCountryRequest]);
 
   // Restore state from URL params on first render
   useEffect(() => {
@@ -399,13 +409,20 @@ const InteractiveMap: React.FC<InteractiveMapProps> = () => {
     const countryParam = params.get('country');
     const subdivisionParam = params.get('subdivision');
 
-    // Validate country code: must be exactly 2 uppercase ASCII letters (ISO 3166-1 alpha-2)
-    if (countryParam && /^[A-Za-z]{2}$/.test(countryParam)) {
-      // Use the country code as a placeholder name — CountryInfo will resolve the real name
-      handleCountryClick(countryParam.toUpperCase(), countryParam.toUpperCase()).then(() => {
-        if (subdivisionParam) setHighlightedSubdivision(subdivisionParam);
-      });
-    }
+    // Accepts alpha-2 (IE), alpha-3 (IRL) or a country name (Ireland).
+    // resolveCountry returns null for anything unrecognised, so the parameter
+    // can never put an arbitrary string into component state.
+    const country = resolveCountry(countryParam);
+    if (!country) return;
+
+    handleCountryClick(country.code, country.name).then(() => {
+      // The subdivision param is validated too — it used to be trusted verbatim
+      // while the country param was checked.
+      if (!isValidSubdivisionCode(subdivisionParam)) return;
+      // Ignore a subdivision that belongs to a different country
+      if (subdivisionParam.slice(0, 2).toUpperCase() !== country.code) return;
+      setHighlightedSubdivision(subdivisionParam.toUpperCase());
+    });
   }, [handleCountryClick]);
 
   const handleSearchResult = useCallback(async (countryCode: string, subdivisionName: string, subdivisionCode?: string) => {
@@ -414,57 +431,65 @@ const InteractiveMap: React.FC<InteractiveMapProps> = () => {
       await handleSearchResult(countryCode, subdivisionName, subdivisionCode);
     };
     setLastRetryAction(() => retryFn);
-    
+
+    const isCurrent = beginCountryRequest();
     try {
       setLoading(true);
       setError(null);
       setIsErrorRetryable(false);
       setSelectedCountry(countryCode);
-      // Resolve the proper country name from the ISO code using the browser's built-in API
-      let resolvedCountryName: string;
-      try {
-        const displayNames = new Intl.DisplayNames(['en'], { type: 'region' });
-        resolvedCountryName = displayNames.of(countryCode.toUpperCase()) ?? countryCode.toUpperCase();
-      } catch {
-        resolvedCountryName = countryCode.toUpperCase();
-      }
-      setSelectedCountryName(resolvedCountryName);
+      // Prefer the app's own country list, falling back to the browser's API
+      setSelectedCountryName(
+        resolveCountry(countryCode)?.name ??
+          new Intl.DisplayNames(['en'], { type: 'region' }).of(countryCode.toUpperCase()) ??
+          countryCode.toUpperCase()
+      );
       setHighlightedSubdivision(subdivisionCode || null); // Set the subdivision to highlight
       setInfoPanelCollapsed(false); // Auto-expand panel when search result is selected
-      
+
       const subdivisionData = await iso3166Service.getCountrySubdivisions(countryCode.toLowerCase());
+      if (!isCurrent()) return;
       setSelectedCountryData(subdivisionData);
     } catch (err) {
+      if (!isCurrent()) return;
       console.error('Error loading country data:', err);
       const { message, isRetryable } = getErrorMessage(err);
       setError(message);
       setIsErrorRetryable(isRetryable);
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
   // All state setters from useState are stable; no external deps needed
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [beginCountryRequest]);
 
   return (
     <>
-      <AppHeader onInfoClick={() => setInfoPanelCollapsed(false)} />
-      <MapWrapper>
+      <AppHeader
+        onInfoClick={() => setInfoPanelCollapsed(false)}
+        onCompareClick={() => setComparisonOpen(true)}
+      />
+      <MapWrapper data-testid="interactive-map">
         <MapSection>
             <div style={{ width: '100%', height: '100%', position: 'absolute', top: `${HEADER_HEIGHT}px`, left: 0, right: 0, bottom: 0, pointerEvents: 'auto' }}>
-            <JSVectorMapComponent
-              onCountryClick={handleCountryClick}
-              onCountryHover={handleCountryHover}
-              onCountryLeave={handleCountryLeave}
-              selectedCountry={selectedCountry || undefined}
-              hoveredCountry={hoveredCountry || undefined}
-            />
+            <ErrorBoundary label="map">
+              <JSVectorMapComponent
+                onCountryClick={handleCountryClick}
+                onCountryHover={handleCountryHover}
+                onCountryLeave={handleCountryLeave}
+                selectedCountry={selectedCountry || undefined}
+                hoveredCountry={hoveredCountry || undefined}
+              />
+            </ErrorBoundary>
           </div>
 
-          {selectedCountry && APP_CONFIG.features.enableSearch && (
+          {/* Search is no longer gated on a country being selected — the
+              cross-country name search was unreachable until you had already
+              picked one, which defeated the point of it. */}
+          {APP_CONFIG.features.enableSearch && (
             <SearchComponent
               onResultSelect={handleSearchResult}
-              subdivisionDropdownVisible={true}
+              subdivisionDropdownVisible={selectedCountry !== null}
             />
           )}
 
@@ -538,21 +563,32 @@ const InteractiveMap: React.FC<InteractiveMapProps> = () => {
 
         <InfoPanel $collapsed={infoPanelCollapsed}>
           {!infoPanelCollapsed && (
-            <CountryInfo
-              countryName={selectedCountryName}
-              countryData={selectedCountryData}
-              countryCode={selectedCountry}
-              highlightedSubdivision={highlightedSubdivision}
-              onClose={() => {
-                setSelectedCountry(null);
-                setSelectedCountryName(null);
-                setSelectedCountryData(null);
-                setHighlightedSubdivision(null);
-              }}
-            />
+            <ErrorBoundary label="info panel">
+              <CountryInfo
+                countryName={selectedCountryName}
+                countryData={selectedCountryData}
+                countryCode={selectedCountry}
+                highlightedSubdivision={highlightedSubdivision}
+                onClose={() => {
+                  setSelectedCountry(null);
+                  setSelectedCountryName(null);
+                  setSelectedCountryData(null);
+                  setHighlightedSubdivision(null);
+                }}
+              />
+            </ErrorBoundary>
           )}
         </InfoPanel>
       </MapWrapper>
+
+      {comparisonOpen && (
+        <ErrorBoundary label="comparison">
+          <CountryComparison
+            initialCountryCode={selectedCountry}
+            onClose={() => setComparisonOpen(false)}
+          />
+        </ErrorBoundary>
+      )}
     </>
   );
 };

@@ -75,6 +75,8 @@ interface CacheEntry<T> {
 class ISO3166Service {
   // Use unknown so stored values must be explicitly cast on retrieval
   private cache: { [key: string]: CacheEntry<unknown> } = {};
+  // Requests that have been issued but have not settled yet, keyed like the cache
+  private inFlight: { [key: string]: Promise<unknown> } = {};
   // Cache entries expire after 10 minutes
   private readonly CACHE_TTL_MS = 10 * 60 * 1000;
   private readonly REQUEST_TIMEOUT_MS = 15000;
@@ -93,22 +95,43 @@ class ISO3166Service {
     this.cache[key] = { data, timestamp: Date.now() };
   }
 
-  // Get all subdivision data for a specific country
+  /**
+   * Run `request` unless an identical one is already in flight, in which case
+   * join it. Without this, two components reacting to the same click both miss
+   * the cache in the same tick and fire duplicate requests.
+   */
+  private dedupe<T>(key: string, request: () => Promise<T>): Promise<T> {
+    const existing = this.inFlight[key];
+    if (existing) return existing as Promise<T>;
+
+    const promise = request().finally(() => {
+      delete this.inFlight[key];
+    });
+    this.inFlight[key] = promise;
+    return promise;
+  }
+
+  // Get all subdivision data for a specific country.
+  // Deliberately takes no AbortSignal: the request is shared between callers, so
+  // one caller aborting would cancel it for everyone. Callers that need to drop
+  // a superseded response discard the result instead (see useLatestRequest).
   async getCountrySubdivisions(countryCode: string): Promise<CountryData> {
     const cacheKey = `subdivisions_${countryCode}`;
     const cached = this.getCached<CountryData>(cacheKey);
     if (cached) return cached;
 
-    try {
-      const response = await axios.get(`${ISO3166_2_API_BASE}/alpha/${countryCode}`, {
-        timeout: this.REQUEST_TIMEOUT_MS,
-      });
-      this.setCached(cacheKey, response.data);
-      return response.data;
-    } catch (error) {
-      console.error(`Error fetching subdivisions for ${countryCode}:`, error);
-      throw error;
-    }
+    return this.dedupe(cacheKey, async () => {
+      try {
+        const response = await axios.get(`${ISO3166_2_API_BASE}/alpha/${countryCode}`, {
+          timeout: this.REQUEST_TIMEOUT_MS,
+        });
+        this.setCached(cacheKey, response.data);
+        return response.data as CountryData;
+      } catch (error) {
+        console.error(`Error fetching subdivisions for ${countryCode}:`, error);
+        throw error;
+      }
+    });
   }
 
   // Get country flag URL
@@ -119,16 +142,21 @@ class ISO3166Service {
     return `${FLAGS_BASE_URL}/iso3166-1-flags/${countryCode.toLowerCase()}.svg`;
   }
 
-  // Get subdivision flag URL
+  // Get subdivision flag URL.
+  // The repository stores these as `<CC>/<CC>-<SUB>.svg` with the subdivision
+  // part in its original case and no padding — e.g. IE/IE-C.svg. The previous
+  // implementation lowercased, zero-padded to two chars and asked for .png,
+  // producing IE-0c.png, which 404s.
   getSubdivisionFlagUrl(countryCode: string | null | undefined, subdivisionCode: string | null | undefined): string {
     if (!countryCode || !subdivisionCode) {
       return ''; // Return empty string for invalid codes
     }
-    const subdivisionPart = subdivisionCode.split('-')[1]?.toLowerCase();
+    const subdivisionPart = subdivisionCode.split('-')[1]?.toUpperCase();
     if (!subdivisionPart) {
       return ''; // Return empty string if subdivision part is invalid
     }
-    return `${FLAGS_BASE_URL}/iso3166-2-flags/${countryCode.toUpperCase()}/${countryCode.toUpperCase()}-${subdivisionPart.padStart(2, '0')}.png`;
+    const country = countryCode.toUpperCase();
+    return `${FLAGS_BASE_URL}/iso3166-2-flags/${country}/${country}-${subdivisionPart}.svg`;
   }
 
   // Search for subdivisions by name
@@ -137,17 +165,19 @@ class ISO3166Service {
     const cached = this.getCached<SearchResult>(cacheKey);
     if (cached) return cached;
 
-    try {
-      const response = await axios.get(
-        `${ISO3166_2_API_BASE}/search/${encodeURIComponent(searchTerm)}?likeness=${likeness}&excludeMatchScore=1`,
-        { timeout: this.REQUEST_TIMEOUT_MS }
-      );
-      this.setCached(cacheKey, response.data);
-      return response.data;
-    } catch (error) {
-      console.error(`Error searching subdivisions for "${searchTerm}":`, error);
-      throw error;
-    }
+    return this.dedupe(cacheKey, async () => {
+      try {
+        const response = await axios.get(
+          `${ISO3166_2_API_BASE}/search/${encodeURIComponent(searchTerm)}?likeness=${likeness}&excludeMatchScore=1`,
+          { timeout: this.REQUEST_TIMEOUT_MS }
+        );
+        this.setCached(cacheKey, response.data);
+        return response.data as SearchResult;
+      } catch (error) {
+        console.error(`Error searching subdivisions for "${searchTerm}":`, error);
+        throw error;
+      }
+    });
   }
 
   // Get country information via the internal /api/country-info proxy.
@@ -158,6 +188,10 @@ class ISO3166Service {
     const cached = this.getCached<RestCountryData>(cacheKey);
     if (cached) return cached;
 
+    return this.dedupe(cacheKey, () => this.fetchCountryInfo(cacheKey, countryCode));
+  }
+
+  private async fetchCountryInfo(cacheKey: string, countryCode: string): Promise<RestCountryData | null> {
     try {
       const response = await axios.get('/api/country-info', {
         params: { code: countryCode },
@@ -229,6 +263,7 @@ class ISO3166Service {
   // Clear the entire cache
   clearCache(): void {
     this.cache = {};
+    this.inFlight = {};
   }
 }
 

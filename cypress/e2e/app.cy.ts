@@ -18,13 +18,20 @@ describe('Application Loading and Navigation', () => {
   });
 
   it('should have responsive header on mobile viewport', () => {
-    cy.viewport('iphone-12');
+    cy.viewport('iphone-x');
     cy.get('header').should('be.visible');
     cy.get('h1').should('be.visible');
   });
 
-  it('should open info button without errors', () => {
-    cy.get('button').contains(/Info/i).click();
+  it('should open the About panel without errors', () => {
+    cy.contains('button', /About/i).click();
+  });
+
+  it('should open the country comparison panel', () => {
+    cy.contains('button', /Compare/i).click();
+    cy.get('[role="dialog"]').should('be.visible').and('contain.text', 'Compare countries');
+    cy.get('[aria-label="Close comparison"]').click();
+    cy.get('[role="dialog"]').should('not.exist');
   });
 
   it('should navigate to external links', () => {

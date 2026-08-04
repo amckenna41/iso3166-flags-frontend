@@ -1,6 +1,7 @@
 {
-  "short_name": "React App",
-  "name": "Create React App Sample",
+  "short_name": "ISO 3166 Flags",
+  "name": "ISO 3166 Flags Explorer",
+  "description": "Interactive map for exploring countries and administrative subdivisions with flags and data from the ISO 3166 standard.",
   "icons": [
     {
       "src": "favicon.ico",
@@ -10,7 +11,8 @@
     {
       "src": "logo192.png",
       "type": "image/png",
-      "sizes": "192x192"
+      "sizes": "192x192",
+      "purpose": "any maskable"
     },
     {
       "src": "logo512.png",
@@ -20,6 +22,6 @@
   ],
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "theme_color": "#667eea",
+  "background_color": "#f8fafc"
 }

@@ -27,14 +27,12 @@ export const APP_CONFIG = {
     github: 'https://github.com/amckenna41',
   },
   
-  // Feature flags (can be used to enable/disable features)
+  // Feature flags — every one of these is read somewhere. Flags that nothing
+  // checks are not configuration, they are dead code.
   features: {
-    showDebugLogs: false,
     enableKeyboardNavigation: true,
-    // Toggle individual UI features without code changes
     enableExport: true,
     enableSearch: true,
-    enableUsageGuide: false,
   },
 };
 

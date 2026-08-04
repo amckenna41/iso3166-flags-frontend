@@ -13,7 +13,7 @@ describe('Responsive Design', () => {
   });
 
   it('should display correctly on mobile', () => {
-    cy.viewport('iphone-12');
+    cy.viewport('iphone-x');
     cy.visit('/');
     cy.get('header').should('be.visible');
     cy.get('button').first().should('be.visible');
@@ -42,14 +42,14 @@ describe('Responsive Design', () => {
   });
 
   it('should have touch-friendly buttons on mobile', () => {
-    cy.viewport('iphone-12');
+    cy.viewport('iphone-x');
     cy.visit('/');
     
     cy.get('button').first().should('have.css', 'min-height');
   });
 
   it('should maintain functionality across viewports', () => {
-    cy.viewport('iphone-12');
+    cy.viewport('iphone-x');
     cy.visit('/');
     cy.get('button').first().click();
     
@@ -59,7 +59,7 @@ describe('Responsive Design', () => {
   });
 
   it('should not overlap elements on mobile', () => {
-    cy.viewport('iphone-12');
+    cy.viewport('iphone-x');
     cy.visit('/');
     
     // Check that key elements are visible and not overlapping
@@ -72,7 +72,7 @@ describe('Responsive Design', () => {
     cy.viewport(1920, 1080);
     cy.wait(500);
     
-    cy.viewport('iphone-12');
+    cy.viewport('iphone-x');
     cy.wait(500);
     
     cy.viewport(1024, 768);

@@ -335,6 +335,8 @@ const SubdivisionModal: React.FC<SubdivisionModalProps> = ({
   const [flagError, setFlagError] = useState(false);
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   const flagUrl =
     subdivision.flag ||
@@ -343,14 +345,45 @@ const SubdivisionModal: React.FC<SubdivisionModalProps> = ({
   // Reset flag error when subdivision changes
   useEffect(() => { setFlagError(false); }, [subdivision.code]);
 
-  // Keyboard navigation
+  // Move focus into the dialog on open and restore it to whatever was focused
+  // before, so keyboard users are not dumped at the top of the document.
+  useEffect(() => {
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    closeButtonRef.current?.focus();
+    return () => {
+      if (previouslyFocused && typeof previouslyFocused.focus === 'function') {
+        previouslyFocused.focus();
+      }
+    };
+  }, []);
+
+  // Keyboard navigation, plus a focus trap so Tab cannot escape to the page
+  // behind the overlay while the dialog is open.
   useEffect(() => {
     if (!APP_CONFIG.features.enableKeyboardNavigation) return;
+
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { e.preventDefault(); onClose(); }
-      else if (e.key === 'ArrowLeft') { e.preventDefault(); onNavigatePrevious(); }
-      else if (e.key === 'ArrowRight') { e.preventDefault(); onNavigateNext(); }
+      if (e.key === 'Escape') { e.preventDefault(); onClose(); return; }
+      if (e.key === 'ArrowLeft') { e.preventDefault(); onNavigatePrevious(); return; }
+      if (e.key === 'ArrowRight') { e.preventDefault(); onNavigateNext(); return; }
+      if (e.key !== 'Tab') return;
+
+      const focusable = contentRef.current?.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input, [tabindex]:not([tabindex="-1"])'
+      );
+      if (!focusable || focusable.length === 0) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
     };
+
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [onClose, onNavigateNext, onNavigatePrevious]);
@@ -387,15 +420,19 @@ const SubdivisionModal: React.FC<SubdivisionModalProps> = ({
   return (
     <ModalOverlay onClick={onClose}>
       <ModalContent
+        ref={contentRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="subdivision-modal-title"
         onClick={e => e.stopPropagation()}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
         <ModalHeader>
-          <ModalCloseButton onClick={onClose} aria-label="Close modal">
+          <ModalCloseButton ref={closeButtonRef} onClick={onClose} aria-label="Close modal">
             <X size={20} />
           </ModalCloseButton>
-          <ModalTitle>
+          <ModalTitle id="subdivision-modal-title">
             {subdivision.name}
             <span style={{ opacity: 0.6, margin: '0 8px' }}>·</span>
             <span style={{ fontFamily: 'monospace' }}>{subdivision.code}</span>

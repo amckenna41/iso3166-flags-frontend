@@ -31,26 +31,35 @@ export interface SubdivisionExportData {
 }
 
 /**
+ * Neutralise spreadsheet formula injection (CWE-1236).
+ *
+ * Excel / Sheets / LibreOffice strip the surrounding quotes of a CSV field and
+ * then evaluate it if it starts with a formula trigger, so quoting alone is not
+ * a defence. Prefixing a single quote forces the cell to be read as text.
+ * Subdivision names and local names come from a third-party API, so this is a
+ * live input path — not a theoretical one.
+ */
+const FORMULA_TRIGGERS = ['=', '+', '-', '@', '\t', '\r'];
+
+export const escapeCSVValue = (value: unknown): string => {
+  // Only null/undefined become empty — 0 and false are real values and must survive.
+  const stringValue = value === null || value === undefined ? '' : String(value);
+  return FORMULA_TRIGGERS.includes(stringValue.charAt(0)) ? `'${stringValue}` : stringValue;
+};
+
+/**
  * Convert array of objects to CSV format
  */
 export const convertToCSV = (data: Record<string, any>[]): string => {
   if (data.length === 0) return '';
 
-  // Get headers from first object
-  const headers = Object.keys(data[0]);
+  // Union of keys across all rows so a sparse first row cannot drop columns
+  const headers = Array.from(new Set(data.flatMap(item => Object.keys(item))));
   const headerLine = headers.map(h => `"${h}"`).join(',');
 
-  // Convert data rows
+  // Convert data rows — every field is quoted, inner quotes doubled
   const rows = data.map(item =>
-    headers.map(header => {
-      const value = item[header];
-      // Escape quotes and wrap in quotes if contains comma, quotes, or newlines
-      const stringValue = String(value || '');
-      if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
-        return `"${stringValue.replace(/"/g, '""')}"`;
-      }
-      return `"${stringValue}"`;
-    }).join(',')
+    headers.map(header => `"${escapeCSVValue(item[header]).replace(/"/g, '""')}"`).join(',')
   );
 
   return [headerLine, ...rows].join('\n');
@@ -120,6 +129,16 @@ export const exportCountriesComparison = (
   downloadCSV(csvContent, filename);
 };
 
+/**
+ * Export multiple countries for comparison as JSON
+ */
+export const exportCountriesComparisonAsJSON = (
+  countries: CountryExportData[]
+): void => {
+  const timestamp = new Date().toISOString().split('T')[0];
+  downloadJSON(countries, `countries-comparison-${timestamp}.json`);
+};
+
 // ── JSON export helpers ───────────────────────────────────────────────────────
 
 /**
@@ -169,6 +188,9 @@ export const exportSubdivisionsAsJSON = (
  * Format country object for export
  */
 export const formatCountryForExport = (country: RestCountryData): CountryExportData => {
+  // Number.isFinite, not truthiness — a population or area of 0 is a real value
+  const num = (n: number | undefined) => (Number.isFinite(n) ? String(n) : '');
+
   return {
     'Country Name': country.name?.common || country.name?.official || '',
     'ISO 3166-1 Alpha-2': country.cca2 || '',
@@ -176,8 +198,8 @@ export const formatCountryForExport = (country: RestCountryData): CountryExportD
     'ISO 3166-1 Numeric': country.ccn3 || '',
     'Region': country.region || '',
     'SubRegion': country.subregion || '',
-    'Population': String(country.population || ''),
-    'Area (km²)': String(country.area || ''),
+    'Population': num(country.population),
+    'Area (km²)': num(country.area),
     'Capital': (country.capital && country.capital.length > 0 ? country.capital[0] : '') || '',
     'Timezone': (country.timezones && country.timezones.length > 0 ? country.timezones[0] : '') || '',
     'Currency': Object.keys(country.currencies || {}).join(', ') || '',
@@ -192,9 +214,12 @@ export const formatSubdivisionForExport = (
   subdivision: SubdivisionData,
   countryName: string
 ): SubdivisionExportData => {
-  const latitude = subdivision.latLng && subdivision.latLng[0] ? String(subdivision.latLng[0]) : '';
-  const longitude = subdivision.latLng && subdivision.latLng[1] ? String(subdivision.latLng[1]) : '';
-  
+  // Number.isFinite, not truthiness — the equator (lat 0) and prime meridian
+  // (lng 0) are valid coordinates and were previously exported as blank.
+  const latitude = Number.isFinite(subdivision.latLng?.[0]) ? String(subdivision.latLng[0]) : '';
+  const longitude = Number.isFinite(subdivision.latLng?.[1]) ? String(subdivision.latLng[1]) : '';
+
+
   return {
     'Subdivision Name': subdivision.name || '',
     'Code': subdivision.code || '',
