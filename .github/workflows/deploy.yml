@@ -24,7 +24,13 @@ jobs:
       
       - name: Install dependencies
         run: npm ci
-      
+
+      # ponytail: typescript@7 ships ESM "exports" only, no "main", so react-scripts'
+      # resolve@1 cannot find it. Pin a CRA-compatible tsc for the build only (--no-save
+      # leaves package.json/package-lock.json untouched). Drop once CRA is replaced (Vite).
+      - name: Install react-scripts-compatible TypeScript
+        run: npm install --no-save --legacy-peer-deps typescript@4.9.5
+
       - name: Build application
         run: npm run build
       
