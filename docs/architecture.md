@@ -7,16 +7,17 @@ graph TB
     subgraph Browser["Browser"]
         subgraph SPA["React SPA"]
             App["App.tsx\n(root)"]
-            EBD["ErrorBoundary\nWraps app · map · info panel · comparison"]
+            EBD["ErrorBoundary\nWraps app · map · info panel\ncomparison · about"]
 
             subgraph Orchestrator["State Orchestrator"]
                 IM["InteractiveMap.tsx\nHolds all app state\nURL ↔ state sync"]
             end
 
             subgraph UILayer["UI Layer"]
-                AH["AppHeader\nBranding · Nav links · Compare"]
+                AH["AppHeader\nBranding · Nav links · Compare · About"]
                 CC["CountryComparison\nUp to 4 countries side by side\nCSV / JSON export"]
-                JVM["JSVectorMapComponent\njsvectormap world map\nClick · Hover · Auto-zoom"]
+                AM["AboutModal\nProject info dialog\nEscape · Focus trap"]
+                JVM["JSVectorMapComponent\njsvectormap world map\nClick · Hover · Zoom/pan\nMiller / Mercator projection"]
                 CD["CountryDropdown\nFavourites · Recents · Search"]
                 SD["SubdivisionDropdown\nFiltered by selected country"]
                 SC["SearchComponent\nGlobal subdivision search\n300 ms debounce"]
@@ -25,7 +26,7 @@ graph TB
                     CI["CountryInfo\nCountry header · Flag · Stats\nFilter · Sort · Virtual list"]
                     EB["ExportButton\nCSV / JSON export"]
                     SM["SubdivisionModal\nFull detail · Swipe · Keyboard nav\nCopy code · Share link"]
-                    DI["DemoInfo\nWelcome / empty state"]
+                    DI["DemoInfo\nProject info — empty state\nand About dialog body"]
                 end
             end
 
@@ -74,6 +75,7 @@ graph TB
     App --> EBD
     EBD --> IM
     IM --> CC
+    IM --> AM
     IM --> AH
     IM --> JVM
     IM --> CD
@@ -83,6 +85,7 @@ graph TB
     CI --> EB
     CI --> SM
     CI --> DI
+    AM --> DI
 
     %% Service wiring
     IM -->|getCountrySubdivisions| SVC
@@ -197,4 +200,7 @@ sequenceDiagram
 | Shape validation on every `localStorage` read | `JSON.parse` succeeding does not mean the value has the expected shape — a tampered entry parses fine and then throws on `.map()` mid-render |
 | CSS `!important` for map selection, not polling | jsvectormap re-applies inline fill/stroke on hover. A CSS rule outranks inline styles, replacing a 100 ms `setInterval` repaint loop with an attribute toggle |
 | Error boundaries per region, not just at the root | A throw in the map, info panel or comparison leaves the rest of the app usable, with a local "Try again" |
-| Workbox service worker, production only | Flags and subdivision data are near-immutable, so caching them is a genuine win; registering in dev would serve stale bundles |
+| Workbox service worker, production only | Flags and subdivision data are near-immutable, so caching them is a genuine win; registering in dev would serve stale bundles. Dev additionally *unregisters* any worker left behind by a local production build, which would otherwise serve precached chunks to the dev server |
+| Region leave detected from the DOM | jsvectormap exposes no region-out callback (only `onRegionClick`, `onRegionSelected`, `onRegionTooltipShow`); its internal `mouseout` handling hides the built-in tooltip and emits nothing, so `mousemove`/`mouseleave` listeners on the canvas drive the custom tooltip's dismissal |
+| Selecting a country does not move the viewport | Highlight only — an auto-zoom fought the user's own zoom and pan, and re-centred the map on every dropdown pick |
+| Projection switch rebuilds the map instance | jsvectormap cannot swap map data in place. The rebuild re-applies the current highlight, and React overlays live outside the container the setup wipes with `innerHTML = ''` |

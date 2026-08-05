@@ -4,8 +4,8 @@
 
 | Layer | Technology | Version | Purpose |
 |---|---|---|---|
-| SPA framework | [React](https://react.dev) | 19.1.x | UI rendering, component model, hooks |
-| Language | [TypeScript](https://www.typescriptlang.org) | 4.9.x | Static typing across all source files |
+| SPA framework | [React](https://react.dev) | 19.2.x | UI rendering, component model, hooks |
+| Language | [TypeScript](https://www.typescriptlang.org) | 4.9.x | Static typing across all source files — pinned: `react-scripts` 5 resolves TypeScript through `resolve@1`, which ignores the `exports`-only manifest that TypeScript 5+ ships, so a newer compiler is not loadable until the build toolchain moves off CRA |
 | Build toolchain | [Create React App](https://create-react-app.dev) (react-scripts) | 5.0.1 | Webpack bundler, dev server (a dev dependency — Jest now runs standalone) |
 | Offline / PWA | [Workbox](https://developer.chrome.com/docs/workbox) | 7.4.x | Service worker: precached app shell, runtime caching of flags and subdivision data |
 | Deployment | [Vercel](https://vercel.com) | — | Static CDN + Serverless Functions |
@@ -25,13 +25,13 @@
 
 | Package | Version | Usage |
 |---|---|---|
-| [jsvectormap](https://jsvectormap.com) | 1.7.x | Interactive SVG world map — click, hover, zoom, `setFocus()` for country auto-zoom |
+| [jsvectormap](https://jsvectormap.com) | 1.7.x | Interactive SVG world map — click, hover, manual zoom/pan. Both bundled projections are registered (`world` Miller, `world_merc` Mercator) and selectable from the map |
 
 ### HTTP & Data
 
 | Package | Version | Usage |
 |---|---|---|
-| [axios](https://axios-http.com) | 1.18.x | HTTP client for all API requests; request timeout configuration |
+| [axios](https://axios-http.com) | 1.19.x | HTTP client for all API requests; request timeout configuration |
 
 ### Browser APIs (no package required)
 
@@ -84,11 +84,11 @@
 |---|---|---|
 | [Jest](https://jestjs.io) | (via `jest.config.js`) | Test runner, assertion library, module mocking — run directly, not through `react-scripts test` |
 | [@testing-library/react](https://testing-library.com/react) | 16.3.x | Component rendering and user-event simulation |
-| [@testing-library/jest-dom](https://github.com/testing-library/jest-dom) | 6.8.x | Custom DOM matchers (`toBeInTheDocument`, `toHaveTextContent`, etc.) |
+| [@testing-library/jest-dom](https://github.com/testing-library/jest-dom) | 7.0.x | Custom DOM matchers (`toBeInTheDocument`, `toHaveTextContent`, etc.) |
 | [@testing-library/user-event](https://github.com/testing-library/user-event) | 13.5.x | Realistic user interaction simulation (type, click, keyboard) |
 | [identity-obj-proxy](https://github.com/keyz/identity-obj-proxy) | 3.0.x | CSS module mock for Jest (maps class names to themselves) |
 
-**Test coverage:** `src/**/*.test.{ts,tsx}` and `tests/**/*.test.{ts,tsx}` — 181 tests across 17 suites (components, services, utils and the `api/country-info` serverless handler).
+**Test coverage:** `src/**/*.test.{ts,tsx}` and `tests/**/*.test.{ts,tsx}` — 202 tests across 19 suites (components, services, utils and the `api/country-info` serverless handler). `JSVectorMapSelection.test.tsx` covers region highlighting, `JSVectorMapVariant.test.tsx` the projection switch and hover tooltip (jsvectormap is mocked — jsdom has no `getBBox`), and `AboutModal.test.tsx` the About dialog and its header button.
 
 | Command | What it runs |
 |---|---|
@@ -100,9 +100,9 @@
 
 | Package | Version | Usage |
 |---|---|---|
-| [Cypress](https://www.cypress.io) | 13.x | Full browser E2E tests covering app load, country selection, search, and responsive layouts |
+| [Cypress](https://www.cypress.io) | 15.x | Full browser E2E tests covering app load, country selection, search, and responsive layouts |
 
-**Test suites:** `cypress/e2e/app.cy.ts`, `country-selection.cy.ts`, `search.cy.ts`, `responsive.cy.ts` — 36 tests. All network calls are stubbed with `cy.intercept()` using path-only patterns (`**/alpha/*`, `**/search/**`, `**/api/country-info*`) so the same specs match both the dev proxy and the public API. Requires the dev server on `http://localhost:3000`.
+**Test suites:** `cypress/e2e/app.cy.ts`, `country-selection.cy.ts`, `search.cy.ts`, `responsive.cy.ts` — 38 tests, including the About dialog, the map projection switch and the selected-country outline (asserted against the real jsvectormap DOM, which the mocked unit suites cannot cover). All network calls are stubbed with `cy.intercept()` using path-only patterns (`**/alpha/*`, `**/search/**`, `**/api/country-info*`) so the same specs match both the dev proxy and the public API. Requires the dev server on `http://localhost:3000`.
 
 ---
 
@@ -169,6 +169,8 @@
 | **Request timeout** | All axios calls have a 15-second timeout to fail fast on slow connections |
 | **Service worker caching** | Flags cache-first (600 entries / 30 days), subdivision data stale-while-revalidate (300 entries / 7 days) |
 | **CSS over polling** | Map selection held by a `[data-selected]` `!important` rule instead of a 100 ms repaint interval |
+| **`vector-effect: non-scaling-stroke`** | Selected-country outline keeps a constant on-screen width; zoom is a `transform: scale()` on the root `<g>`, which would otherwise thicken the stroke with it |
+| **Ref, not dependency, for selection** | The map rebuild reads the live selection from a ref — a prop dependency would tear down and rebuild the whole map on every country click |
 | **Inline style for cursor position** | Tooltip x/y kept out of the styled-components template, which would inject a class per pixel of movement |
 | **`Array.isArray()` guards** | Prevents `.map()` / `.reduce()` TypeErrors when the RestCountries v5 API returns unexpected field types |
 
@@ -179,6 +181,6 @@
 | **Touch swipe navigation** | `touchstart` + `touchend` in `SubdivisionModal` — only triggers on predominantly horizontal swipes (≥50 px, Δx ≥ 1.5× Δy) |
 | **Keyboard navigation** | `ArrowLeft` / `ArrowRight` to navigate subdivisions and `Escape` to close the modal (gated by `enableKeyboardNavigation`); `ArrowUp`/`ArrowDown`/`Home`/`End`/`Enter`/`Escape` in `CountryDropdown` and `SearchComponent`; `ExportButton` submenus open on click and Enter/Space rather than hover only |
 | **`@media (pointer: coarse)`** | Swipe hint shown only on touch devices |
-| **Semantic HTML + ARIA** | `role="listbox"` / `role="option"` / `aria-selected` in the country dropdown, `role="combobox"` + `aria-activedescendant` in search, `role="menu"` / `role="menuitem"` in the export menu, `role="dialog"` + focus restore in the comparison and subdivision modals, `role="alert"` in the error fallback |
+| **Semantic HTML + ARIA** | `role="listbox"` / `role="option"` / `aria-selected` in the country dropdown, `role="combobox"` + `aria-activedescendant` in search, `role="menu"` / `role="menuitem"` in the export menu, `role="dialog"` + focus restore in the about, comparison and subdivision modals, `role="alert"` in the error fallback; the map projection selector carries `aria-label="Map projection"` |
 | **Real buttons** | The dropdown clear control is a sibling `<button>`, not a `<span role="button">` nested inside another button |
 | **Responsive breakpoints** | Three tiers: desktop (>1024px), tablet (768–1024px), mobile (<768px) — handled with styled-components media queries |

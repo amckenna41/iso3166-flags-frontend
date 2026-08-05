@@ -19,7 +19,20 @@ type Config = {
 };
 
 export function register(config?: Config): void {
-  if (process.env.NODE_ENV !== 'production' || !('serviceWorker' in navigator)) return;
+  if (!('serviceWorker' in navigator)) return;
+
+  // A worker registered by an earlier production build (`serve -s build` on :3000)
+  // keeps controlling that origin in dev and serves its precached bundle to the dev
+  // server. The stale chunks then meet a fresh webpack runtime, which surfaces as
+  // "originalFactory.call is not a function" from react-refresh. Clear it out.
+  // `ready` never settles when nothing is registered, so enumerate instead.
+  if (process.env.NODE_ENV !== 'production') {
+    navigator.serviceWorker
+      .getRegistrations()
+      .then(registrations => registrations.forEach(registration => registration.unregister()))
+      .catch(() => {});
+    return;
+  }
 
   // A worker cannot control pages on a different origin
   const publicUrl = new URL(process.env.PUBLIC_URL as string, window.location.href);

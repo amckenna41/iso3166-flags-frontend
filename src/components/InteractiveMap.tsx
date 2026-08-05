@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, X, AlertCircle, Loader } from 'lucide-react'
 import { iso3166Service, CountryData } from '../services/iso3166Service';
 import { getErrorMessage } from '../utils/errorHandler';
 import CountryInfo from './CountryInfo';
+import AboutModal from './AboutModal';
 import AppHeader from './AppHeader';
 import SearchComponent from './SearchComponent';
 import CountryDropdown from './CountryDropdown';
@@ -290,6 +291,7 @@ const InteractiveMap: React.FC<InteractiveMapProps> = () => {
   const [lastRetryAction, setLastRetryAction] = useState<(() => Promise<void>) | null>(null);
   const [infoPanelCollapsed, setInfoPanelCollapsed] = useState(false);
   const [comparisonOpen, setComparisonOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
 
   // Tracks whether the URL has been parsed on initial mount
   const urlInitialized = useRef(false);
@@ -466,7 +468,7 @@ const InteractiveMap: React.FC<InteractiveMapProps> = () => {
   return (
     <>
       <AppHeader
-        onInfoClick={() => setInfoPanelCollapsed(false)}
+        onInfoClick={() => setAboutOpen(true)}
         onCompareClick={() => setComparisonOpen(true)}
       />
       <MapWrapper data-testid="interactive-map">
@@ -580,6 +582,12 @@ const InteractiveMap: React.FC<InteractiveMapProps> = () => {
           )}
         </InfoPanel>
       </MapWrapper>
+
+      {aboutOpen && (
+        <ErrorBoundary label="about">
+          <AboutModal onClose={() => setAboutOpen(false)} />
+        </ErrorBoundary>
+      )}
 
       {comparisonOpen && (
         <ErrorBoundary label="comparison">

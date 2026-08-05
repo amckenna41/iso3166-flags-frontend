@@ -68,6 +68,17 @@ describe('Country Selection Workflow', () => {
     cy.wait('@getSubdivisions');
   });
 
+  it('should outline the selected country on the map, and only that country', () => {
+    cy.get('[data-testid="country-dropdown-trigger"]').click();
+    cy.get('[data-testid="country-dropdown-search"]').type('Germany');
+    cy.get('[data-testid="country-option-DE"]').click();
+    cy.wait('@getSubdivisions');
+
+    // jsvectormap tags each region path with its uppercase alpha-2 code.
+    cy.get('path[data-code="DE"]').should('have.attr', 'data-selected', 'true');
+    cy.get('[data-selected="true"]').should('have.length', 1);
+  });
+
   it('should display the selected country name in the trigger after selection', () => {
     cy.get('[data-testid="country-dropdown-trigger"]').click();
     cy.get('[data-testid="country-dropdown-search"]').type('Germany');

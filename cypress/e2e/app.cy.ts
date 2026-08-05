@@ -23,8 +23,19 @@ describe('Application Loading and Navigation', () => {
     cy.get('h1').should('be.visible');
   });
 
-  it('should open the About panel without errors', () => {
+  it('should open and close the About dialog', () => {
+    cy.get('[role="dialog"]').should('not.exist');
     cy.contains('button', /About/i).click();
+    cy.get('[role="dialog"]').should('be.visible').and('contain.text', 'About');
+    cy.get('[aria-label="Close about dialog"]').click();
+    cy.get('[role="dialog"]').should('not.exist');
+  });
+
+  it('should switch the map projection', () => {
+    cy.get('[data-testid="map-variant-select"]').should('have.value', 'world');
+    cy.get('[data-testid="map-variant-select"]').select('world_merc');
+    cy.get('[data-testid="map-variant-select"]').should('have.value', 'world_merc');
+    cy.get('.jvm-region').should('exist');
   });
 
   it('should open the country comparison panel', () => {
