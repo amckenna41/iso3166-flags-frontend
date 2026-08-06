@@ -342,8 +342,13 @@ const SubdivisionModal: React.FC<SubdivisionModalProps> = ({
     subdivision.flag ||
     iso3166Service.getSubdivisionFlagUrl(countryCode, subdivision.code);
 
-  // Reset flag error when subdivision changes
-  useEffect(() => { setFlagError(false); }, [subdivision.code]);
+  // Reset flag error when subdivision changes, and scroll the card back to its
+  // top so navigating next/previous never lands mid-way down the new content.
+  useEffect(() => {
+    setFlagError(false);
+    // ponytail: scrollTop over scrollTo() — a plain property, so no jsdom guard.
+    if (contentRef.current) contentRef.current.scrollTop = 0;
+  }, [subdivision.code]);
 
   // Move focus into the dialog on open and restore it to whatever was focused
   // before, so keyboard users are not dumped at the top of the document.

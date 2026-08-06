@@ -134,11 +134,12 @@ const MapCanvas = styled.div`
   height: 100%;
 `;
 
-// Sits top-right: every other overlay (search, country/subdivision dropdowns) is
-// anchored left, and the zoom buttons take the top-left corner.
+// Sits on the right, one row below the search box (which is 122px down from the
+// map section top, i.e. 60px into this container, and ~43px tall). On narrow
+// viewports the search box reaches the right edge, so sharing its row hid this.
 const MapVariantSelect = styled.select`
   position: absolute;
-  top: 50px;
+  top: 115px;
   right: 20px;
   z-index: 1000;
   height: 40px;

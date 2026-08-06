@@ -18,16 +18,19 @@ export interface CountryExportData {
   'Languages': string;
 }
 
+// Key order is the CSV column order and the JSON key order — both come straight
+// from Object.keys, so keep this list and the literal in formatSubdivisionForExport
+// in the same order.
 export interface SubdivisionExportData {
   'Subdivision Name': string;
   'Code': string;
+  'Local Name': string;
   'Parent Country': string;
+  'Parent Code': string;
   'Type': string;
+  'Flag URL': string;
   'Latitude': string;
   'Longitude': string;
-  'Parent Code': string;
-  'Flag URL': string;
-  'Local Name': string;
 }
 
 /**
@@ -223,12 +226,12 @@ export const formatSubdivisionForExport = (
   return {
     'Subdivision Name': subdivision.name || '',
     'Code': subdivision.code || '',
+    'Local Name': subdivision.localOtherName || '',
     'Parent Country': countryName,
+    'Parent Code': subdivision.parentCode || '',
     'Type': subdivision.type || '',
+    'Flag URL': subdivision.flag || '',
     'Latitude': latitude,
     'Longitude': longitude,
-    'Parent Code': subdivision.parentCode || '',
-    'Flag URL': subdivision.flag || '',
-    'Local Name': subdivision.localOtherName || '',
   };
 };

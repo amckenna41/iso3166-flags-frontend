@@ -108,6 +108,11 @@ describe('formatSubdivisionForExport', () => {
   it('should map SubdivisionData fields to the export schema', () => {
     const result = formatSubdivisionForExport(mockSubdivision, 'Germany');
     expect(result['Subdivision Name']).toBe('Berlin');
+    // Key order drives both CSV column order and JSON key order
+    expect(Object.keys(result)).toEqual([
+      'Subdivision Name', 'Code', 'Local Name', 'Parent Country',
+      'Parent Code', 'Type', 'Flag URL', 'Latitude', 'Longitude',
+    ]);
     expect(result['Code']).toBe('DE-BE');
     expect(result['Parent Country']).toBe('Germany');
     expect(result['Type']).toBe('State');
