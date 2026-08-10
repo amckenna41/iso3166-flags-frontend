@@ -8,7 +8,6 @@ jest.mock('../../../src/services/iso3166Service', () => ({
   iso3166Service: {
     getCountryInfo: jest.fn(),
     getCountryFlagUrl: jest.fn(code => `https://flags.example.com/${code}.png`),
-    getSubdivisionFlagUrl: jest.fn((country, code) => `https://flags.example.com/${country}/${code}.png`),
   },
 }));
 
@@ -150,5 +149,39 @@ describe('CountryInfo', () => {
     // Verify the subdivision card heading (h4) is present
     const berlinHeading = screen.getAllByText('Berlin').find(el => el.tagName === 'H4');
     expect(berlinHeading).toBeInTheDocument();
+  });
+
+  describe('country navigation arrows', () => {
+    it('steps to the alphabetical neighbours of the current country', () => {
+      const onSelectCountry = jest.fn();
+      render(<CountryInfo {...defaultProps} onSelectCountry={onSelectCountry} />);
+
+      fireEvent.click(screen.getByLabelText('Previous country'));
+      expect(onSelectCountry).toHaveBeenCalledWith('GE', 'Georgia');
+
+      fireEvent.click(screen.getByLabelText('Next country'));
+      expect(onSelectCountry).toHaveBeenCalledWith('GH', 'Ghana');
+    });
+
+    it('wraps around at the ends of the list', () => {
+      const onSelectCountry = jest.fn();
+      // Afghanistan is first alphabetically; previous must wrap to the last entry.
+      render(
+        <CountryInfo
+          {...defaultProps}
+          countryName="Afghanistan"
+          countryCode="AF"
+          onSelectCountry={onSelectCountry}
+        />
+      );
+
+      fireEvent.click(screen.getByLabelText('Previous country'));
+      expect(onSelectCountry).toHaveBeenCalledWith('ZW', 'Zimbabwe');
+    });
+
+    it('renders no arrows without a navigation handler', () => {
+      render(<CountryInfo {...defaultProps} />);
+      expect(screen.queryByLabelText('Next country')).toBeNull();
+    });
   });
 });

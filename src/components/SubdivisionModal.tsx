@@ -16,7 +16,7 @@ import {
   Check,
   Link2,
 } from 'lucide-react';
-import { iso3166Service, SubdivisionData } from '../services/iso3166Service';
+import { SubdivisionData } from '../services/iso3166Service';
 import APP_CONFIG from '../config/appConfig';
 
 // ── Styled components ─────────────────────────────────────────────────────────
@@ -338,9 +338,9 @@ const SubdivisionModal: React.FC<SubdivisionModalProps> = ({
   const contentRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
-  const flagUrl =
-    subdivision.flag ||
-    iso3166Service.getSubdivisionFlagUrl(countryCode, subdivision.code);
+  // ponytail: the API's `flag` field is the only source of truth — most
+  // subdivisions have no official flag, so never build a repo URL for them.
+  const flagUrl = subdivision.flag;
 
   // Reset flag error when subdivision changes, and scroll the card back to its
   // top so navigating next/previous never lands mid-way down the new content.
@@ -449,7 +449,7 @@ const SubdivisionModal: React.FC<SubdivisionModalProps> = ({
             </InlineCopyButton>
           </ModalTitle>
           <ModalSubtitle>
-            {flagError ? (
+            {!flagUrl || flagError ? (
               <ModalFlagPlaceholder>🏳</ModalFlagPlaceholder>
             ) : (
               <ModalFlag
@@ -522,18 +522,30 @@ const SubdivisionModal: React.FC<SubdivisionModalProps> = ({
               <div className="content">
                 <span className="label">Flag URL</span>
                 <span className="value">
-                  <a
-                    href={flagUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      color: '#667eea',
-                      textDecoration: 'none',
-                      wordBreak: 'break-all',
-                    }}
-                  >
-                    {flagUrl}
-                  </a>
+                  {flagUrl ? (
+                    <>
+                      <a
+                        href={flagUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          color: '#667eea',
+                          textDecoration: 'none',
+                          wordBreak: 'break-all',
+                        }}
+                      >
+                        {flagUrl}
+                      </a>
+                      <InlineCopyButton
+                        onClick={() => copyCode(flagUrl)}
+                        title="Copy flag URL"
+                      >
+                        {copiedCode === flagUrl ? <Check size={14} /> : <Copy size={14} />}
+                      </InlineCopyButton>
+                    </>
+                  ) : (
+                    'Not available'
+                  )}
                 </span>
               </div>
             </ModalDetailItem>

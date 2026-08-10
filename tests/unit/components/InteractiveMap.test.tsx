@@ -20,7 +20,6 @@ jest.mock('../../../src/services/iso3166Service', () => ({
   iso3166Service: {
     getCountrySubdivisions: jest.fn(),
     getCountryFlagUrl: jest.fn().mockReturnValue(''),
-    getSubdivisionFlagUrl: jest.fn().mockReturnValue(''),
     getCountryInfo: jest.fn(),
     searchSubdivisions: jest.fn().mockResolvedValue({}),
     getAllCountries: jest.fn().mockResolvedValue({}),

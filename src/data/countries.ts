@@ -289,3 +289,88 @@ export const resolveCountry = (input: string | null | undefined): Country | null
     null
   );
 };
+
+// Countries and territories with no outline of their own on the jsvectormap
+// world map — every ISO 3166-1 code the app supports that the map has no region
+// for. They get a pin instead, shown only while that country is selected.
+// Values are [lat, lng] of the territory's centre.
+// ponytail: plain lookup table, derived once from the map's own region list.
+// Antarctica is deliberately absent: it is missing from the map because the
+// projection cuts it off, not because it is small.
+export const SMALL_COUNTRY_MARKERS: Record<string, [number, number]> = {
+  AD: [42.5000, 1.5000],        // Andorra
+  AG: [17.0500, -61.8000],      // Antigua and Barbuda
+  AI: [18.2500, -63.1667],      // Anguilla
+  AS: [-14.3333, -170.0000],    // American Samoa
+  AW: [12.5000, -69.9667],      // Aruba
+  AX: [60.1167, 19.9000],       // Åland Islands
+  BB: [13.1667, -59.5333],      // Barbados
+  BH: [26.0000, 50.5500],       // Bahrain
+  BL: [17.9000, -62.8333],      // Saint Barthélemy
+  BM: [32.3333, -64.7500],      // Bermuda
+  BQ: [12.1800, -68.2500],      // Bonaire, Sint Eustatius and Saba
+  BV: [-54.4333, 3.4000],       // Bouvet Island
+  CC: [-12.5000, 96.8333],      // Cocos (Keeling) Islands
+  CK: [-21.2333, -159.7667],    // Cook Islands
+  CV: [16.0000, -24.0000],      // Cape Verde
+  CW: [12.1167, -68.9333],      // Curaçao
+  CX: [-10.5000, 105.6667],     // Christmas Island
+  DM: [15.4167, -61.3333],      // Dominica
+  FM: [6.9167, 158.2500],       // Micronesia
+  FO: [62.0000, -7.0000],       // Faroe Islands
+  GD: [12.1167, -61.6667],      // Grenada
+  GF: [4.0000, -53.0000],       // French Guiana
+  GG: [49.4667, -2.5833],       // Guernsey
+  GI: [36.1333, -5.3500],       // Gibraltar
+  GP: [16.2500, -61.5833],      // Guadeloupe
+  GS: [-54.5000, -37.0000],     // South Georgia and the South Sandwich Islands
+  GU: [13.4667, 144.7833],      // Guam
+  HK: [22.2670, 114.1880],      // Hong Kong
+  HM: [-53.1000, 72.5167],      // Heard Island and McDonald Islands
+  IM: [54.2500, -4.5000],       // Isle of Man
+  IO: [-6.0000, 71.5000],       // British Indian Ocean Territory
+  JE: [49.2500, -2.1667],       // Jersey
+  KI: [1.4167, 173.0000],       // Kiribati
+  KM: [-12.1667, 44.2500],      // Comoros
+  KN: [17.3333, -62.7500],      // Saint Kitts and Nevis
+  KY: [19.5000, -80.5000],      // Cayman Islands
+  LC: [13.8833, -60.9667],      // Saint Lucia
+  LI: [47.2667, 9.5333],        // Liechtenstein
+  MC: [43.7333, 7.4000],        // Monaco
+  MF: [18.0708, -63.0501],      // Saint Martin (French part)
+  MH: [9.0000, 168.0000],       // Marshall Islands
+  MO: [22.1667, 113.5500],      // Macao
+  MP: [15.2000, 145.7500],      // Northern Mariana Islands
+  MQ: [14.6667, -61.0000],      // Martinique
+  MS: [16.7500, -62.2000],      // Montserrat
+  MT: [35.8333, 14.5833],       // Malta
+  MU: [-20.2833, 57.5500],      // Mauritius
+  MV: [3.2500, 73.0000],        // Maldives
+  NF: [-29.0333, 167.9500],     // Norfolk Island
+  NR: [-0.5333, 166.9167],      // Nauru
+  NU: [-19.0333, -169.8667],    // Niue
+  PF: [-17.6797, -149.4068],    // French Polynesia (Tahiti)
+  PM: [46.8333, -56.3333],      // Saint Pierre and Miquelon
+  PN: [-25.0667, -130.1000],    // Pitcairn Islands
+  PW: [7.5000, 134.5000],       // Palau
+  RE: [-21.1500, 55.5000],      // Réunion
+  SC: [-4.5833, 55.6667],       // Seychelles
+  SG: [1.3667, 103.8000],       // Singapore
+  SH: [-15.9500, -5.7200],      // Saint Helena
+  SJ: [78.0000, 20.0000],       // Svalbard and Jan Mayen
+  SM: [43.7667, 12.4167],       // San Marino
+  ST: [0.3333, 6.7333],         // São Tomé and Príncipe
+  SX: [18.0333, -63.0500],      // Sint Maarten
+  TC: [21.7500, -71.5833],      // Turks and Caicos Islands
+  TK: [-9.0000, -172.0000],     // Tokelau
+  TO: [-20.0000, -175.0000],    // Tonga
+  TV: [-8.0000, 178.0000],      // Tuvalu
+  UM: [19.3000, 166.6333],      // U.S. Minor Outlying Islands
+  VA: [41.9000, 12.4500],       // Vatican City
+  VC: [13.2500, -61.2000],      // Saint Vincent and the Grenadines
+  VG: [18.4314, -64.6231],      // British Virgin Islands
+  VI: [18.3500, -64.9333],      // U.S. Virgin Islands
+  WF: [-13.3000, -176.2000],    // Wallis and Futuna
+  WS: [-13.5833, -172.3333],    // Samoa
+  YT: [-12.8333, 45.1667],      // Mayotte
+};

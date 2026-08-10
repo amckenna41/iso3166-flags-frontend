@@ -33,35 +33,6 @@ describe('iso3166Service', () => {
     });
   });
 
-  describe('getSubdivisionFlagUrl', () => {
-    it('should return a valid flag URL for a subdivision code', () => {
-      // The flags repository stores these as <CC>/<CC>-<SUB>.svg, uppercase and
-      // unpadded. Lowercasing/zero-padding to .png produced URLs that 404.
-      expect(iso3166Service.getSubdivisionFlagUrl('US', 'US-CA')).toBe(
-        'https://raw.githubusercontent.com/amckenna41/iso3166-flags/main/iso3166-2-flags/US/US-CA.svg'
-      );
-    });
-
-    it('should not zero-pad single-character subdivision codes', () => {
-      // Regression: IE-C used to become IE-0c.png
-      expect(iso3166Service.getSubdivisionFlagUrl('IE', 'IE-C')).toBe(
-        'https://raw.githubusercontent.com/amckenna41/iso3166-flags/main/iso3166-2-flags/IE/IE-C.svg'
-      );
-    });
-
-    it('should return empty string when countryCode is null', () => {
-      expect(iso3166Service.getSubdivisionFlagUrl(null, 'US-CA')).toBe('');
-    });
-
-    it('should return empty string when subdivisionCode is null', () => {
-      expect(iso3166Service.getSubdivisionFlagUrl('US', null)).toBe('');
-    });
-
-    it('should return empty string when subdivisionCode has no hyphen part', () => {
-      expect(iso3166Service.getSubdivisionFlagUrl('US', 'INVALID')).toBe('');
-    });
-  });
-
   describe('getCountrySubdivisions', () => {
     it('should return subdivision data from the API', async () => {
       const mockData = {

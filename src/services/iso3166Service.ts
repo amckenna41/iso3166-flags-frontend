@@ -51,7 +51,7 @@ export interface SubdivisionData {
   type: string;
   parentCode?: string;
   latLng: [number, number];
-  flag: string;
+  flag: string | null; // null for the many subdivisions with no official flag
   history?: SubdivisionHistory[];
 }
 
@@ -142,22 +142,9 @@ class ISO3166Service {
     return `${FLAGS_BASE_URL}/iso3166-1-flags/${countryCode.toLowerCase()}.svg`;
   }
 
-  // Get subdivision flag URL.
-  // The repository stores these as `<CC>/<CC>-<SUB>.svg` with the subdivision
-  // part in its original case and no padding — e.g. IE/IE-C.svg. The previous
-  // implementation lowercased, zero-padded to two chars and asked for .png,
-  // producing IE-0c.png, which 404s.
-  getSubdivisionFlagUrl(countryCode: string | null | undefined, subdivisionCode: string | null | undefined): string {
-    if (!countryCode || !subdivisionCode) {
-      return ''; // Return empty string for invalid codes
-    }
-    const subdivisionPart = subdivisionCode.split('-')[1]?.toUpperCase();
-    if (!subdivisionPart) {
-      return ''; // Return empty string if subdivision part is invalid
-    }
-    const country = countryCode.toUpperCase();
-    return `${FLAGS_BASE_URL}/iso3166-2-flags/${country}/${country}-${subdivisionPart}.svg`;
-  }
+  // ponytail: no getSubdivisionFlagUrl — most subdivisions have no official
+  // flag, so the API's `flag` field is the only source of truth. Building a
+  // repo URL from the code produced links that 404.
 
   // Search for subdivisions by name
   async searchSubdivisions(searchTerm: string, likeness: number = 80): Promise<SearchResult> {

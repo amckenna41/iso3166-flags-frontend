@@ -3,6 +3,7 @@ import jsVectorMap from 'jsvectormap';
 import 'jsvectormap/dist/jsvectormap.css';
 import styled from 'styled-components';
 import { iso3166Service } from '../services/iso3166Service';
+import { SMALL_COUNTRY_MARKERS } from '../data/countries';
 
 // Import world map data. Both projections jsvectormap ships are registered up
 // front; switching between them is just a different `map` name at build time.
@@ -28,6 +29,21 @@ const getCountryName = (code: string): string => {
   }
 };
 
+// The pinned code for a country, or null when that country has its own region.
+const smallCountryMarker = (code?: string | null): string | null => {
+  const upper = code?.toUpperCase();
+  return upper && SMALL_COUNTRY_MARKERS[upper] ? upper : null;
+};
+
+// jsvectormap's marker config for a country, or an empty list when that country
+// has no pin — which is what "show nothing" looks like to the library.
+const markerConfigFor = (code?: string | null) => {
+  const pinned = smallCountryMarker(code);
+  return pinned
+    ? [{ name: getCountryName(pinned), coords: SMALL_COUNTRY_MARKERS[pinned] }]
+    : [];
+};
+
 const MapContainer = styled.div`
   width: 100%;
   height: 100%;
@@ -44,6 +60,10 @@ const MapContainer = styled.div`
 
   .jsvectormap-container svg {
     pointer-events: auto !important;
+  }
+
+  .jvm-marker {
+    cursor: pointer;
   }
 
   .jsvectormap-container .jsvectormap-series-region path {
@@ -267,6 +287,8 @@ const JSVectorMapComponent: React.FC<JSVectorMapProps> = ({
   // whole map every time the user picks a country.
   const selectedCountryRef = useRef<string | undefined>(selectedCountry);
   selectedCountryRef.current = selectedCountry;
+  // Country whose pin is currently on the map, or null when no pin is shown.
+  const pinnedCountryRef = useRef<string | null>(null);
   // Whether the cursor is currently over a country, so the leave handler fires
   // once on the way out instead of on every mousemove across the ocean.
   const hoveringRegionRef = useRef(false);
@@ -299,8 +321,12 @@ const JSVectorMapComponent: React.FC<JSVectorMapProps> = ({
 
     // Track cursor position; only trigger a re-render when the tooltip is shown
     const handleMouseMove = (e: MouseEvent) => {
+      // jvm-marker counts as hovering too, otherwise the pin's tooltip would be
+      // hidden by this handler the moment it is shown.
       const target = e.target as Element | null;
-      if (!target?.classList?.contains('jvm-region')) {
+      const overMap = target?.classList?.contains('jvm-region')
+        || target?.classList?.contains('jvm-marker');
+      if (!overMap) {
         leaveRegion();
       }
 
@@ -373,6 +399,53 @@ const JSVectorMapComponent: React.FC<JSVectorMapProps> = ({
         },
         regionsSelectable: false,
         regionsSelectableOne: false,
+        // Only the selected country is ever pinned, so a rebuild starts from
+        // whatever is selected now and the selection effect keeps it in step.
+        markers: markerConfigFor(selectedCountryRef.current),
+        markerStyle: {
+          initial: {
+            fill: '#1d4ed8',
+            stroke: '#ffffff',
+            strokeWidth: 1.5,
+            r: 5,
+          },
+          hover: {
+            fill: '#1d4ed8',
+            r: 7,
+          },
+        },
+        onMarkerClick: () => {
+          // The pinned country is the only marker on the map, so its code comes
+          // from the ref rather than the marker index.
+          const countryCode = pinnedCountryRef.current;
+          if (!countryCode) return;
+
+          currentlySelectedRef.current = countryCode;
+          if (mapInstance.current?.regions) {
+            applySelection(mapInstance.current.regions, countryCode);
+          }
+
+          onCountryClick?.(countryCode, getCountryName(countryCode));
+        },
+        onMarkerTooltipShow: (event: any, tooltip: any) => {
+          const countryCode = pinnedCountryRef.current;
+          if (!countryCode) return;
+
+          // Same custom tooltip the regions use, so pins do not look different.
+          if (tooltip?.element) tooltip.element.style.display = 'none';
+
+          hoveringRegionRef.current = true;
+          const { x, y } = mousePositionRef.current;
+          setCustomTooltip({
+            visible: true,
+            countryName: getCountryName(countryCode),
+            flagUrl: iso3166Service.getCountryFlagUrl(countryCode),
+            x,
+            y,
+          });
+
+          onCountryHover?.(countryCode, getCountryName(countryCode));
+        },
         onRegionClick: (event: any, code: string) => {
           const countryName = getCountryName(code);
           const countryCode = code.toUpperCase();
@@ -416,6 +489,8 @@ const JSVectorMapComponent: React.FC<JSVectorMapProps> = ({
         // is handled by the mousemove/mouseleave listeners above.
       });
 
+      pinnedCountryRef.current = smallCountryMarker(selectedCountryRef.current);
+
       // Regions are built synchronously by the constructor, so the highlight can be
       // restored immediately — the new projection opens on the same selected country.
       if (mapInstance.current?.regions) {
@@ -456,6 +531,15 @@ const JSVectorMapComponent: React.FC<JSVectorMapProps> = ({
         const countryCode = selectedCountry ? selectedCountry.toUpperCase() : null;
 
         applySelection(regions, countryCode);
+
+        // A pin marks the selected country when it is too small to have a
+        // clickable region, so it appears and disappears with the selection.
+        const pinned = smallCountryMarker(countryCode);
+        if (pinned !== pinnedCountryRef.current) {
+          mapInstance.current.removeMarkers?.();
+          if (pinned) mapInstance.current.addMarkers?.(markerConfigFor(pinned));
+          pinnedCountryRef.current = pinned;
+        }
 
         // Selecting a country only highlights it — the viewport is left wherever the
         // user put it, so their own zoom/pan survives picking a country.

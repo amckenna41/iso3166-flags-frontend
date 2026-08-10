@@ -11,7 +11,6 @@ import {
 import { readCountryList, writeCountryList } from '../../../src/utils/storage';
 import { isValidSubdivisionCode, oneOf, mergeUrlState, readUrlState } from '../../../src/utils/urlState';
 import { resolveCountry, COUNTRIES } from '../../../src/data/countries';
-import { iso3166Service } from '../../../src/services/iso3166Service';
 
 describe('CSV formula injection', () => {
   it.each(['=', '+', '-', '@', '\t', '\r'])('neutralises a leading %j', trigger => {
@@ -136,13 +135,5 @@ describe('country resolution', () => {
 
   it('covers the full ISO 3166-1 list', () => {
     expect(COUNTRIES).toHaveLength(249);
-  });
-});
-
-describe('subdivision flag URLs', () => {
-  it('does not lowercase, zero-pad, or use the wrong extension', () => {
-    // IE-C previously produced .../IE/IE-0c.png, which 404s
-    expect(iso3166Service.getSubdivisionFlagUrl('ie', 'IE-C')).toMatch(/\/IE\/IE-C\.svg$/);
-    expect(iso3166Service.getSubdivisionFlagUrl('US', 'US-CA')).toMatch(/\/US\/US-CA\.svg$/);
   });
 });

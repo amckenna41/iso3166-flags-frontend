@@ -17,13 +17,13 @@ graph TB
                 AH["AppHeader\nBranding · Nav links · Compare · About"]
                 CC["CountryComparison\nUp to 4 countries side by side\nCSV / JSON export"]
                 AM["AboutModal\nProject info dialog\nEscape · Focus trap"]
-                JVM["JSVectorMapComponent\njsvectormap world map\nClick · Hover · Zoom/pan\nMiller / Mercator projection"]
+                JVM["JSVectorMapComponent\njsvectormap world map\nClick · Hover · Zoom/pan\nMiller / Mercator projection\nPin for unmapped countries"]
                 CD["CountryDropdown\nFavourites · Recents · Search"]
                 SD["SubdivisionDropdown\nFiltered by selected country"]
                 SC["SearchComponent\nGlobal subdivision search\n300 ms debounce"]
 
                 subgraph InfoPanel["Info Panel (right)"]
-                    CI["CountryInfo\nCountry header · Flag · Stats\nFilter · Sort · Virtual list"]
+                    CI["CountryInfo\nCountry header · Flag · Stats\nPrev/next country arrows\nFilter · Sort · Virtual list"]
                     EB["ExportButton\nCSV / JSON export"]
                     SM["SubdivisionModal\nFull detail · Swipe · Keyboard nav\nCopy code · Share link"]
                     DI["DemoInfo\nProject info — empty state\nand About dialog body"]
@@ -35,7 +35,7 @@ graph TB
                 CFG["appConfig.ts\nFeature flags · Env vars · URLs"]
                 EXP["exportUtils.ts\nCSV / JSON formatters\nFormula-injection escaping"]
                 ERR["errorHandler.ts\nUser-facing error messages"]
-                CTRY["data/countries.ts\nISO 3166-1 list (249)\nresolveCountry(alpha-2/3/name)"]
+                CTRY["data/countries.ts\nISO 3166-1 list (249)\nresolveCountry(alpha-2/3/name)\nSMALL_COUNTRY_MARKERS (75)"]
                 UST["utils/urlState.ts\nMerge · validate query params"]
                 STO["utils/storage.ts\nShape-validated localStorage"]
                 ULR["utils/useLatestRequest.ts\nOut-of-order response guard"]
@@ -103,7 +103,9 @@ graph TB
     SD -->|getCountrySubdivisions| SVC
     SVC -->|GET /api/alpha/:code| ISO_API
     SVC -->|GET /api/search/:term| ISO_API
-    SVC -->|flag URL| FLAGS_CDN
+    SVC -->|country flag URL| FLAGS_CDN
+    CI -->|prev/next country| IM
+    JVM -->|marker coords| CTRY
     SVC -->|GET /api/country-info| FN
     SVC -.->|dev only: GET /api/country-info| PROXY
     FN -->|Bearer token| RC_API
@@ -140,6 +142,7 @@ sequenceDiagram
     participant RC as RestCountries v5
 
     User->>Map: Click country (e.g. GB)
+    Note over Map: Countries with no region on the map<br/>(e.g. CW) are clicked as a pin and<br/>dispatch the same callback
     Map->>IM: onCountryClick("GB", "United Kingdom")
     IM->>IM: setSelectedCountry / expand panel / update URL
     IM->>SVC: getCountrySubdivisions("gb")
@@ -204,3 +207,6 @@ sequenceDiagram
 | Region leave detected from the DOM | jsvectormap exposes no region-out callback (only `onRegionClick`, `onRegionSelected`, `onRegionTooltipShow`); its internal `mouseout` handling hides the built-in tooltip and emits nothing, so `mousemove`/`mouseleave` listeners on the canvas drive the custom tooltip's dismissal |
 | Selecting a country does not move the viewport | Highlight only — an auto-zoom fought the user's own zoom and pan, and re-centred the map on every dropdown pick |
 | Projection switch rebuilds the map instance | jsvectormap cannot swap map data in place. The rebuild re-applies the current highlight, and React overlays live outside the container the setup wipes with `innerHTML = ''` |
+| Pins only for countries the map has no region for | 75 of the 249 supported countries are missing from jsvectormap's world data and were unreachable by clicking. The list is derived from the map's own region keys, not curated by eye, and a test re-derives it — so an upgrade to the map data cannot silently strand a country |
+| One pin at a time, tied to the selection | 75 permanent pins would clutter the map and compete with the regions for clicks. The pin appears with the selection and is removed when it changes, which also makes it the selection indicator for countries that have no region to fill |
+| Subdivision flag URLs are never constructed | Most subdivisions have no official flag; the ISO 3166-2 API returns `flag: null`. Building a URL from the code produced links that 404 and broken images, so the API field is the only source of truth |

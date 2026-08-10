@@ -25,7 +25,7 @@
 
 | Package | Version | Usage |
 |---|---|---|
-| [jsvectormap](https://jsvectormap.com) | 1.7.x | Interactive SVG world map — click, hover, manual zoom/pan. Both bundled projections are registered (`world` Miller, `world_merc` Mercator) and selectable from the map |
+| [jsvectormap](https://jsvectormap.com) | 1.7.x | Interactive SVG world map — click, hover, manual zoom/pan. Both bundled projections are registered (`world` Miller, `world_merc` Mercator) and selectable from the map. Its `markers` API pins the 75 supported countries the map data has no region for |
 
 ### HTTP & Data
 
@@ -70,9 +70,9 @@
 
 | Service | URL | Data provided |
 |---|---|---|
-| ISO 3166-2 API | `https://iso3166-2-api.vercel.app/api` | Subdivision name, type, parent code, coordinates, local name, history, flag URL |
+| ISO 3166-2 API | `https://iso3166-2-api.vercel.app/api` | Subdivision name, type, parent code, coordinates, local name, history, flag URL (`null` for the many subdivisions with no official flag) |
 | RestCountries v5 | `https://api.restcountries.com/countries/v5` | Country name, capital, region, population, area, currencies, languages, timezones, TLD, memberships |
-| ISO 3166 Flags CDN | `https://raw.githubusercontent.com/amckenna41/iso3166-flags/main` | SVG country flags (`iso3166-1-flags/<cc>.svg`) and SVG subdivision flags (`iso3166-2-flags/<CC>/<CC>-<SUB>.svg`) |
+| ISO 3166 Flags CDN | `https://raw.githubusercontent.com/amckenna41/iso3166-flags/main` | SVG country flags (`iso3166-1-flags/<cc>.svg`). Subdivision flag URLs are never constructed from a code — they are used only as the ISO 3166-2 API supplies them, because most subdivisions have no flag in the repository |
 
 ---
 
@@ -88,7 +88,7 @@
 | [@testing-library/user-event](https://github.com/testing-library/user-event) | 13.5.x | Realistic user interaction simulation (type, click, keyboard) |
 | [identity-obj-proxy](https://github.com/keyz/identity-obj-proxy) | 3.0.x | CSS module mock for Jest (maps class names to themselves) |
 
-**Test coverage:** `src/**/*.test.{ts,tsx}` and `tests/**/*.test.{ts,tsx}` — 202 tests across 19 suites (components, services, utils and the `api/country-info` serverless handler). `JSVectorMapSelection.test.tsx` covers region highlighting, `JSVectorMapVariant.test.tsx` the projection switch and hover tooltip (jsvectormap is mocked — jsdom has no `getBBox`), and `AboutModal.test.tsx` the About dialog and its header button.
+**Test coverage:** `src/**/*.test.{ts,tsx}` and `tests/**/*.test.{ts,tsx}` — 212 tests across 22 suites (components, services, utils, reference data and the `api/country-info` serverless handler). `JSVectorMapSelection.test.tsx` covers region highlighting, `JSVectorMapVariant.test.tsx` the projection switch, hover tooltip and small-country pins (jsvectormap is mocked — jsdom has no `getBBox`), `smallCountryMarkers.test.ts` checks the pin list against the real `world.js` region list, `SubdivisionModal.test.tsx` the flag-URL row, and `AboutModal.test.tsx` the About dialog and its header button.
 
 | Command | What it runs |
 |---|---|
@@ -102,7 +102,7 @@
 |---|---|---|
 | [Cypress](https://www.cypress.io) | 15.x | Full browser E2E tests covering app load, country selection, search, and responsive layouts |
 
-**Test suites:** `cypress/e2e/app.cy.ts`, `country-selection.cy.ts`, `search.cy.ts`, `responsive.cy.ts` — 38 tests, including the About dialog, the map projection switch and the selected-country outline (asserted against the real jsvectormap DOM, which the mocked unit suites cannot cover). All network calls are stubbed with `cy.intercept()` using path-only patterns (`**/alpha/*`, `**/search/**`, `**/api/country-info*`) so the same specs match both the dev proxy and the public API. Requires the dev server on `http://localhost:3000`.
+**Test suites:** `cypress/e2e/app.cy.ts`, `country-selection.cy.ts`, `search.cy.ts`, `responsive.cy.ts` — 40 tests, including the About dialog, the map projection switch, the selected-country outline, the prev/next country arrows and the pin shown for a country the map has no region for (asserted against the real jsvectormap DOM, which the mocked unit suites cannot cover). All network calls are stubbed with `cy.intercept()` using path-only patterns (`**/alpha/*`, `**/search/**`, `**/api/country-info*`) so the same specs match both the dev proxy and the public API. Requires the dev server on `http://localhost:3000`.
 
 ---
 

@@ -51,7 +51,7 @@
   - "Regions in Asia with population > 10M"
 
 - [ ] Provide some validation or automation around ensuring the latest version of lipis/flag-icons and REST countries API.
-- [ ] In the Country card on the top right, add left and right arrows allowing you to filter to the left and right country.
+- [x] In the Country card on the top right, add left and right arrows allowing you to filter to the left and right country.
 - [ ] When clicking to the right and left within the subdivision cards, the page should go to the top of the subdivision.
 - [x] The About button isnt working.
 - [x] Clicking on a country should highlght it.

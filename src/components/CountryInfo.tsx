@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import styled, { keyframes } from 'styled-components';
-import { X, MapPin, Flag, Globe, Users, Calendar, ExternalLink, Code, Building2, Compass, Ruler, Clock, DollarSign, Languages, Copy, Check, ArrowUpDown, Globe2, Star, ChevronUp } from 'lucide-react';
+import { X, MapPin, Flag, Globe, Users, Calendar, ExternalLink, Code, Building2, Compass, Ruler, Clock, DollarSign, Languages, Copy, Check, ArrowUpDown, Globe2, Star, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react';
 import { CountryData, RestCountryData, SubdivisionData, iso3166Service } from '../services/iso3166Service';
 import APP_CONFIG from '../config/appConfig';
 import DemoInfo from './DemoInfo';
@@ -10,7 +10,11 @@ import { readCountryList, writeCountryList } from '../utils/storage';
 import { scrollIntoViewIfSupported } from '../utils/dom';
 import { useLatestRequest } from '../utils/useLatestRequest';
 import { mergeUrlState, readUrlState, oneOf } from '../utils/urlState';
-import { resolveCountry } from '../data/countries';
+import { COUNTRIES, resolveCountry } from '../data/countries';
+
+// Alphabetical by display name — the same order the country dropdown shows,
+// so the arrows step through countries in the order the user sees them.
+const COUNTRIES_BY_NAME = [...COUNTRIES].sort((a, b) => a.name.localeCompare(b.name));
 
 const InfoContainer = styled.div`
   height: 100%;
@@ -45,13 +49,37 @@ const CloseButton = styled.button`
   }
 `;
 
-const ExportButtonContainer = styled.div`
+// One flex row for every header action left of the close button. The export
+// button's width varies with breakpoint, so laying the arrows out relative to
+// it beats absolutely positioning each one and guessing offsets.
+const HeaderActions = styled.div`
   position: absolute;
   top: 15px;
   right: 55px;
-  
+  display: flex;
+  align-items: center;
+  gap: 4px;
+
   @media (max-width: 480px) {
     right: 50px;
+  }
+`;
+
+const CountryNavButton = styled.button`
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.2s;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.3);
   }
 `;
 
@@ -61,14 +89,16 @@ const TitleRow = styled.div`
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 0 80px 6px 0;
+  /* Right margin clears the close button plus the HeaderActions row
+     (two 32px arrows + the export button, which narrows at each breakpoint). */
+  margin: 0 220px 6px 0;
 
   @media (max-width: 768px) {
-    margin-right: 70px;
+    margin-right: 205px;
   }
 
   @media (max-width: 480px) {
-    margin-right: 60px;
+    margin-right: 190px;
   }
 `;
 
@@ -87,7 +117,7 @@ const CountryTitle = styled.h2`
 `;
 
 const OfficialName = styled.p`
-  margin: 0 80px 8px 0;
+  margin: 0 220px 8px 0;
   font-size: 12px;
   color: rgba(255, 255, 255, 0.6);
   font-style: italic;
@@ -807,6 +837,7 @@ interface CountryInfoProps {
   countryCode?: string | null;
   highlightedSubdivision?: string | null;
   onClose: () => void;
+  onSelectCountry?: (countryCode: string, countryName: string) => void;
 }
 
 const SORT_ORDERS = ['code-asc', 'name-asc', 'name-desc'] as const;
@@ -819,7 +850,7 @@ const SORT_LABELS: Record<SortOrder, string> = {
 
 const VIRTUAL_PAGE = 30;
 
-const CountryInfo: React.FC<CountryInfoProps> = ({ countryName, countryData, countryCode, highlightedSubdivision, onClose }) => {
+const CountryInfo: React.FC<CountryInfoProps> = ({ countryName, countryData, countryCode, highlightedSubdivision, onClose, onSelectCountry }) => {
   const [showRawData, setShowRawData] = useState<{ [key: string]: boolean }>({});
   const [countryInfo, setCountryInfo] = useState<RestCountryData | null>(null);
   const [loadingInfo, setLoadingInfo] = useState(false);
@@ -1126,6 +1157,19 @@ const CountryInfo: React.FC<CountryInfoProps> = ({ countryName, countryData, cou
     return subdivisions[0].code.split('-')[0];
   };
 
+  // Previous/next country in the dropdown's alphabetical order. Wraps at both
+  // ends, so there is no disabled state to explain.
+  // ponytail: neighbours computed here rather than passed in — the parent
+  // already exposes its country-select handler, so one prop covers both arrows.
+  const countryNeighbour = (step: 1 | -1) => {
+    const index = COUNTRIES_BY_NAME.findIndex(c => c.code === countryCode?.toUpperCase());
+    if (index === -1) return null;
+    const { length } = COUNTRIES_BY_NAME;
+    return COUNTRIES_BY_NAME[(index + step + length) % length];
+  };
+  const previousCountry = onSelectCountry ? countryNeighbour(-1) : null;
+  const nextCountry = onSelectCountry ? countryNeighbour(1) : null;
+
   // ── Scroll-driven collapse values ──────────────────────────────────────────
   // Collapse completes over the first 140px of scroll. Ease-out so the initial
   // scroll feels immediate while the final collapse slows down.
@@ -1158,7 +1202,25 @@ const CountryInfo: React.FC<CountryInfoProps> = ({ countryName, countryData, cou
         <CloseButton onClick={onClose}>
           <X size={18} />
         </CloseButton>
-        <ExportButtonContainer>
+        <HeaderActions>
+          {previousCountry && nextCountry && (
+            <>
+              <CountryNavButton
+                onClick={() => onSelectCountry!(previousCountry.code, previousCountry.name)}
+                aria-label="Previous country"
+                title={`Previous: ${previousCountry.name}`}
+              >
+                <ChevronLeft size={18} />
+              </CountryNavButton>
+              <CountryNavButton
+                onClick={() => onSelectCountry!(nextCountry.code, nextCountry.name)}
+                aria-label="Next country"
+                title={`Next: ${nextCountry.name}`}
+              >
+                <ChevronRight size={18} />
+              </CountryNavButton>
+            </>
+          )}
           {APP_CONFIG.features.enableExport && (
             <ExportButton
               country={countryInfo}
@@ -1166,7 +1228,7 @@ const CountryInfo: React.FC<CountryInfoProps> = ({ countryName, countryData, cou
               countryName={countryName || undefined}
             />
           )}
-        </ExportButtonContainer>
+        </HeaderActions>
         <TitleRow>
           {getCountryCode() && (
             <InlineFlagSmall
@@ -1455,11 +1517,14 @@ const CountryInfo: React.FC<CountryInfoProps> = ({ countryName, countryData, cou
                     onClick={() => handleSubdivisionClick(subdivision)}
                   >
                     <SubdivisionHeader>
-                      {flagErrors.has(subdivision.code) ? (
+                      {/* ponytail: the API's `flag` field is the only source of
+                          truth — most subdivisions have no official flag, so
+                          never build a repo URL for them. */}
+                      {!subdivision.flag || flagErrors.has(subdivision.code) ? (
                         <FlagPlaceholder title="Flag not available">🏳</FlagPlaceholder>
                       ) : (
                         <SubdivisionFlag
-                          src={subdivision.flag || iso3166Service.getSubdivisionFlagUrl(getCountryCode(), subdivision.code)}
+                          src={subdivision.flag}
                           alt={`${subdivision.name} flag`}
                           loading="lazy"
                           onError={() => setFlagErrors(prev => { const next = new Set(prev); next.add(subdivision.code); return next; })}
@@ -1519,13 +1584,17 @@ const CountryInfo: React.FC<CountryInfoProps> = ({ countryName, countryData, cou
                           <ExternalLink size={12} style={{ display: 'inline', marginRight: '4px' }} />
                           Flag URL:
                         </FlagUrlLabel>
-                        <FlagUrl 
-                          href={subdivision.flag || iso3166Service.getSubdivisionFlagUrl(getCountryCode(), subdivision.code)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          {subdivision.flag || iso3166Service.getSubdivisionFlagUrl(getCountryCode(), subdivision.code)}
-                        </FlagUrl>
+                        {subdivision.flag ? (
+                          <FlagUrl
+                            href={subdivision.flag}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            {subdivision.flag}
+                          </FlagUrl>
+                        ) : (
+                          <NoDataText>Not available</NoDataText>
+                        )}
                       </FlagUrlRow>
 
                       {subdivision.history && subdivision.history.length > 0 && (

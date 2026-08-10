@@ -103,6 +103,37 @@ describe('Country Selection Workflow', () => {
     cy.get('[data-testid="country-dropdown-list"]').should('not.be.visible');
   });
 
+  it('should step to the next country alphabetically from the country card', () => {
+    cy.get('[data-testid="country-dropdown-trigger"]').click();
+    cy.get('[data-testid="country-dropdown-search"]').type('Germany');
+    cy.get('[data-testid="country-option-DE"]').click();
+    cy.wait('@getSubdivisions');
+
+    cy.get('[aria-label="Next country"]').click();
+
+    // Ghana follows Germany in the dropdown's alphabetical order.
+    cy.get('[data-testid="country-dropdown-trigger"]').should('contain.text', 'Ghana');
+    cy.get('path[data-code="GH"]').should('have.attr', 'data-selected', 'true');
+  });
+
+  it('should pin a country that has no region on the map, and only while selected', () => {
+    // Curaçao is absent from jsvectormap's world data, so a marker is the only
+    // way to reach it on the map.
+    cy.get('[data-testid="country-dropdown-trigger"]').click();
+    cy.get('[data-testid="country-dropdown-search"]').type('Curaçao');
+    cy.get('[data-testid="country-option-CW"]').click();
+    cy.wait('@getSubdivisions');
+
+    cy.get('circle.jvm-marker').should('have.length', 1);
+
+    // Selecting a country that has its own outline removes the pin again.
+    cy.get('[data-testid="country-dropdown-trigger"]').click();
+    cy.get('[data-testid="country-dropdown-search"]').type('Germany');
+    cy.get('[data-testid="country-option-DE"]').click();
+
+    cy.get('circle.jvm-marker').should('not.exist');
+  });
+
   it('should show a flag image for the selected country in the trigger', () => {
     cy.get('[data-testid="country-dropdown-trigger"]').click();
     cy.get('[data-testid="country-dropdown-search"]').type('Germany');

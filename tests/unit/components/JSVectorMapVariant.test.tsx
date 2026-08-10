@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 
 // jsvectormap needs real SVG geometry (getBBox) that jsdom does not implement, so
 // the library is faked. The fake records how it was constructed, which is exactly
@@ -11,6 +11,9 @@ const mockDestroyed: string[] = [];
 // Captures the options each instance was built with, so tests can drive the
 // library's callbacks (there is no real map to hover in jsdom).
 const mockOptions: any[] = [];
+
+// Marker add/remove calls, in order — pins are managed after construction.
+const mockMarkerCalls: [string, any][] = [];
 
 jest.mock('jsvectormap', () => {
   return jest.fn().mockImplementation((options: any) => {
@@ -25,6 +28,8 @@ jest.mock('jsvectormap', () => {
     };
     return {
       regions: { IE: makeRegion(), US: makeRegion() },
+      addMarkers: (config: any) => mockMarkerCalls.push(['add', config]),
+      removeMarkers: (indexes?: any) => mockMarkerCalls.push(['remove', indexes]),
       destroy: () => mockDestroyed.push(options.map),
     };
   });
@@ -52,6 +57,7 @@ beforeEach(() => {
   mockConstructions.length = 0;
   mockDestroyed.length = 0;
   mockOptions.length = 0;
+  mockMarkerCalls.length = 0;
   (jest.requireMock('jsvectormap') as jest.Mock).mockClear();
 });
 
@@ -99,6 +105,55 @@ describe('map projection variants', () => {
 
     expect(screen.getByTestId('map-variant-select')).toBeInTheDocument();
     expect(screen.getByTestId('map-variant-select')).toHaveValue('world_merc');
+  });
+});
+
+describe('small-country markers', () => {
+  const CURACAO_PIN = { name: 'Curaçao', coords: [12.1167, -68.9333] };
+
+  it('shows no pin until a pinned country is selected', () => {
+    render(<JSVectorMapComponent />);
+
+    expect(mockOptions[0].markers).toEqual([]);
+  });
+
+  it('pins Curaçao once it is selected', async () => {
+    const { rerender } = render(<JSVectorMapComponent />);
+
+    rerender(<JSVectorMapComponent selectedCountry="CW" />);
+
+    // The selection effect is debounced by 100ms.
+    await waitFor(() => expect(mockMarkerCalls).toEqual([
+      ['remove', undefined],
+      ['add', [CURACAO_PIN]],
+    ]));
+  });
+
+  it('removes the pin when a different country is selected', async () => {
+    const { rerender } = render(<JSVectorMapComponent selectedCountry="CW" />);
+    await waitFor(() => expect(mockOptions).toHaveLength(1));
+    mockMarkerCalls.length = 0;
+
+    rerender(<JSVectorMapComponent selectedCountry="IE" />);
+
+    await waitFor(() => expect(mockMarkerCalls).toEqual([['remove', undefined]]));
+  });
+
+  it('keeps the pin across a projection switch', () => {
+    render(<JSVectorMapComponent selectedCountry="CW" />);
+
+    switchToMercator();
+
+    expect(mockOptions[1].markers).toEqual([CURACAO_PIN]);
+  });
+
+  it('selects the country when its pin is clicked', () => {
+    const onCountryClick = jest.fn();
+    render(<JSVectorMapComponent selectedCountry="CW" onCountryClick={onCountryClick} />);
+
+    act(() => mockOptions[0].onMarkerClick({}, '0'));
+
+    expect(onCountryClick).toHaveBeenCalledWith('CW', 'Curaçao');
   });
 });
 
@@ -159,6 +214,21 @@ describe('hover tooltip', () => {
     fireEvent.mouseLeave(canvas);
 
     expect(screen.queryByText('Ireland')).not.toBeInTheDocument();
+  });
+
+  it('keeps the tooltip while the cursor is over a marker pin', () => {
+    const { container } = render(<JSVectorMapComponent selectedCountry="CW" />);
+    const canvas = canvasOf(container);
+    const pin = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    pin.setAttribute('class', 'jvm-marker jvm-element');
+    canvas.appendChild(pin);
+    act(() => {
+      mockOptions[0].onMarkerTooltipShow({}, { element: { style: {} } }, '0');
+    });
+
+    moveOver(canvas, pin);
+
+    expect(screen.getByText('Curaçao')).toBeInTheDocument();
   });
 
   it('notifies the parent once when the country is left', () => {

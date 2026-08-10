@@ -571,6 +571,7 @@ const InteractiveMap: React.FC<InteractiveMapProps> = () => {
                 countryData={selectedCountryData}
                 countryCode={selectedCountry}
                 highlightedSubdivision={highlightedSubdivision}
+                onSelectCountry={handleCountryClick}
                 onClose={() => {
                   setSelectedCountry(null);
                   setSelectedCountryName(null);
